@@ -67,7 +67,7 @@ ChatWidget.init({
 });
 ```
 
-Features: SSE streaming, inline citations [REF:doc:page], screenshot rendering [IMG:page:idx], PDF viewer with page images, source badges, feedback (thumbs up/down with reason popup), copy, export chat, suggestions, multi-turn history, localStorage persistence, scroll-to-bottom, mobile responsive, lazy loading.
+Features: SSE streaming, inline citations [REF:doc:page], screenshot rendering [IMG:page:idx] (max 400px), PDF viewer with page images (eager-load near target, X-Total-Pages header), source badges, feedback (thumbs up/down with reason popup), copy, export chat, starter question cards (from trained Q&A), follow-up suggestions, multi-turn history, localStorage persistence, scroll-to-bottom, mobile responsive.
 
 ## 6-Layer Learning System
 
@@ -101,11 +101,18 @@ Layer 6: Agent Persona — auto-generated from document analysis
 
 ## Tenant Admin Panel (6 tabs)
 1. **Dashboard** — Bento metrics, feedback stats (thumbs up/down, satisfaction %), document quality, needs attention
-2. **Documents** — Upload, document library, document detail (7 tabs: Overview, PDF, Standardized, Screenshots, Knowledge, Wiki, Compliance)
-3. **Chat** — Shared chat widget + context panel (documents, agent status)
-4. **Logs** — Query metrics, live stream, feedback tracking
+2. **Documents** — Multi-file upload, document library with Train/Re-Train/Standardize actions, Train All button, full-text search across page content, document versioning (v1→v2 chain), document detail (7 tabs: Overview, PDF, Standardized, Screenshots, Knowledge, Wiki, Compliance)
+3. **Chat** — Shared chat widget + context panel, starter question cards (ChatGPT-style, from trained Q&A pairs), inline screenshots
+4. **Logs** — Query metrics, live stream, feedback tracking, answer quality scores
 5. **Config** — Agent persona, tone/style/role, auto-generate from documents
 6. **Embed** — Enable/disable, public URL, widget code, iframe code, preview
+7. **Pipeline Terminal** — Persistent bottom bar visible across all tabs, SSE streaming of training progress, auto-resumes on page refresh
+
+## Starter Question Cards
+ChatGPT-style 2×2 card grid on welcome screen. Questions sourced from:
+- `sops.qa_pairs` — 30-50 Q&A pairs generated during knowledge extraction (pipeline step 5)
+- `intent_routes` — queries discovered during auto-training (pipeline steps 9-11)
+Cards are filtered (15-120 chars), deduplicated, shuffled randomly on each load. More docs = more diverse cards. Clicking a card sends the question immediately.
 
 ## Document Processing Pipeline (18 steps)
 
@@ -171,10 +178,17 @@ GET  /conversations         → List conversations
 
 ### Tenant Admin (`/api/t/{tenant_id}/admin/*`)
 ```
-POST   /upload-multiple     → Upload multiple files at once
-POST   /process/{id}/stream → SSE streaming pipeline progress
-GET    /search?q=term       → Full-text search across all page content
-GET    /sops/{id}/versions  → Document version history
+POST   /upload-multiple      → Upload multiple files at once
+POST   /process/{id}/stream  → SSE streaming pipeline progress (training continues on disconnect)
+GET    /search?q=term        → Full-text search across all page content with highlighted snippets
+GET    /sops/{id}/versions   → Document version history (linked list chain)
+GET    /starter-questions    → Random starter questions from trained Q&A pairs + intent routes
+GET    /training/logs        → Poll training status and logs (resumes on page refresh)
+```
+
+### Health (`/api/health`)
+```
+GET    /api/health → Deep health check: DB latency, disk free, memory RSS, OpenRouter key, uptime
 ```
 
 ## Security

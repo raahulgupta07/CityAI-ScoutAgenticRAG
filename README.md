@@ -69,16 +69,18 @@ Super Admin (SvelteKit)     Tenant Admin (HTML)        Public Chat
 Single `chat-widget.js` (45KB) powers both admin and public chat:
 
 - SSE streaming with tool step visualization
+- **Starter question cards** — ChatGPT-style 2×2 grid, sourced from trained Q&A pairs
 - Inline citations `[REF:doc:page]` → clickable, opens PDF viewer
-- Screenshots `[IMG:page:index]` → rendered inline
+- Screenshots `[IMG:page:index]` → rendered inline (max 400px)
 - Referenced page thumbnails at end of each answer
-- PDF viewer with page images (slide-in panel)
+- PDF viewer with page images (slide-in panel, eager-load near target)
 - Feedback with reason popup
+- Follow-up suggestions
 - Multi-turn conversation history
 - Export chat as text
 - localStorage persistence (1hr TTL)
 - Mobile responsive
-- Source badges, copy button, suggestions
+- Source badges, copy button
 
 ## Features
 
@@ -91,7 +93,9 @@ Single `chat-widget.js` (45KB) powers both admin and public chat:
 - **Multi-file Upload** — drag & drop multiple files, per-file progress status
 - **Full-text Search** — search across all page content with highlighted snippets
 - **Train All** — one-click bulk training for all untrained documents with SSE progress bars
+- **Persistent Pipeline Terminal** — fixed bottom bar, visible across all tabs, auto-resumes on page refresh
 - **Answer Quality Scoring** — auto-scored 0-100 per response (citations, sources, formatting, confidence)
+- **Starter Question Cards** — ChatGPT-style cards from trained Q&A, random per reload, click to ask
 - **Auto Persona Generation** — analyzes all documents to generate agent system prompt
 - **30-50 Q&A pairs** per document with answers and page references
 - **Configurable per tenant** — name, role, focus, tone, style, languages, custom prompt
