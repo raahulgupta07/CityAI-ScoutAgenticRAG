@@ -22,7 +22,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 
 from backend.core.database import get_tenant_screenshot_dir
 from backend.core.config import ADMIN_USER, ADMIN_PASS
-import hashlib, secrets, time, resource, shutil
+import hashlib, secrets, time, resource, shutil, threading
 
 _server_start_time = time.time()
 
@@ -483,6 +483,45 @@ async def rate_limit_chat(request: Request, call_next):
     """Apply rate limits: /api/chat = 20/min, /api/admin/process = 5/min."""
     # Rate limiting is handled by slowapi decorators on individual routes
     return await call_next(request)
+
+# ── Scheduled Re-Training Background Thread ───────────────────────────────────
+
+def _retrain_scheduler():
+    """Background thread: check every hour if tenants need re-training."""
+    import time as _time
+    while True:
+        _time.sleep(3600)  # Check every hour
+        try:
+            from backend.core.database import list_tenants, get_runtime_config, list_sops, set_runtime_config
+            from backend.core.trainer import process_and_train
+            for tenant in list_tenants():
+                tid = tenant["id"]
+                try:
+                    enabled = get_runtime_config("retrain_enabled", tenant_id=tid)
+                    if enabled != "true":
+                        continue
+                    interval = int(get_runtime_config("retrain_interval_days", tenant_id=tid) or 7)
+                    last = get_runtime_config("last_retrain", tenant_id=tid) or ""
+                    if last:
+                        from datetime import datetime, timedelta
+                        last_dt = datetime.fromisoformat(last)
+                        if datetime.now() - last_dt < timedelta(days=interval):
+                            continue
+                    # Re-train all docs
+                    for doc in list_sops(tenant_id=tid):
+                        if doc.get("pdf_path"):
+                            try:
+                                process_and_train(doc["pdf_path"], doc["sop_id"], tenant_id=tid)
+                            except Exception:
+                                pass
+                    from datetime import datetime
+                    set_runtime_config("last_retrain", datetime.now().isoformat(), tenant_id=tid)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+threading.Thread(target=_retrain_scheduler, daemon=True).start()
 
 # ── Frontend catch-all (serves SvelteKit static build) ───────────────────────
 if FRONTEND_DIR.exists():

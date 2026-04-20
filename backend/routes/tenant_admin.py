@@ -9,7 +9,7 @@ import threading
 from queue import Queue
 from typing import Optional
 from pathlib import Path
-from fastapi import APIRouter, Query, UploadFile, File
+from fastapi import APIRouter, Body, Query, UploadFile, File
 from fastapi.responses import Response, StreamingResponse
 
 from backend.core import database as db
@@ -257,6 +257,36 @@ async def get_versions(tenant_id: str, sop_id: str):
         versions.append(d)
         current_id = d.get("previous_version_id")
     return {"sop_id": sop_id, "versions": versions, "total": len(versions)}
+
+
+@router.put("/sops/{sop_id}/pin")
+async def toggle_pin(tenant_id: str, sop_id: str):
+    """Toggle pinned/starred state for a document."""
+    conn = db.get_db(tenant_id)
+    try:
+        conn.execute("UPDATE sops SET pinned = NOT COALESCE(pinned, FALSE) WHERE sop_id = %s", (sop_id,))
+        conn.commit()
+        row = conn.execute("SELECT pinned FROM sops WHERE sop_id = %s", (sop_id,)).fetchone()
+        return {"pinned": row["pinned"] if row else False}
+    finally:
+        conn.close()
+
+
+@router.put("/sops/{sop_id}")
+async def update_sop_fields(tenant_id: str, sop_id: str, body: dict = Body(default={})):
+    """Update mutable SOP fields (currently: tags)."""
+    sop = db.get_sop(sop_id, tenant_id=tenant_id)
+    if not sop:
+        return {"error": "Document not found"}
+    conn = db.get_db(tenant_id)
+    try:
+        if "tags" in body:
+            tags = body["tags"] if isinstance(body["tags"], list) else []
+            conn.execute("UPDATE sops SET tags = %s WHERE sop_id = %s", (json.dumps(tags), sop_id))
+            conn.commit()
+        return {"status": "updated", "sop_id": sop_id}
+    finally:
+        conn.close()
 
 
 @router.delete("/sops/{sop_id}")
@@ -720,6 +750,48 @@ async def get_training_logs(tenant_id: str, since: int = 0):
     return {"logs": get_training_logs(since), "status": get_training_status(), "total": len(get_training_logs())}
 
 
+@router.get("/analytics")
+async def get_analytics(tenant_id: str):
+    """Analytics dashboard data: daily counts, top queries, low quality queries."""
+    conn = db.get_db(tenant_id)
+    try:
+        # Daily query counts (last 7 days)
+        daily = conn.execute("""
+            SELECT DATE(created_at) as day, COUNT(*) as count,
+                   AVG(CASE WHEN duration_s IS NOT NULL THEN duration_s ELSE NULL END) as avg_duration
+            FROM query_log
+            WHERE created_at > NOW() - INTERVAL '7 days'
+            GROUP BY DATE(created_at) ORDER BY day
+        """).fetchall()
+        # Top queries (grouped by question text)
+        top = conn.execute("""
+            SELECT question, COUNT(*) as count
+            FROM query_log GROUP BY question ORDER BY count DESC LIMIT 10
+        """).fetchall()
+        # Low quality (low score or thumbs down)
+        low = conn.execute("""
+            SELECT question, quality_score, feedback, created_at
+            FROM query_log WHERE quality_score < 50 OR feedback = 'down'
+            ORDER BY created_at DESC LIMIT 10
+        """).fetchall()
+        # Satisfaction stats
+        thumbs_up = conn.execute("SELECT COUNT(*) FROM query_log WHERE feedback = 'up'").fetchone()[0]
+        thumbs_down = conn.execute("SELECT COUNT(*) FROM query_log WHERE feedback = 'down'").fetchone()[0]
+        total_queries = conn.execute("SELECT COUNT(*) FROM query_log").fetchone()[0]
+        low_quality_count = conn.execute("SELECT COUNT(*) FROM query_log WHERE quality_score < 50").fetchone()[0]
+        return {
+            "daily": [{"day": str(r[0]), "count": r[1], "avg_duration": float(r[2]) if r[2] else 0} for r in daily],
+            "top_queries": [{"question": r[0], "count": r[1]} for r in top],
+            "low_quality": [{"question": r[0], "quality_score": r[1], "feedback": r[2], "created_at": str(r[3])} for r in low],
+            "thumbs_up": thumbs_up or 0,
+            "thumbs_down": thumbs_down or 0,
+            "total_queries": total_queries or 0,
+            "low_quality_count": low_quality_count or 0,
+        }
+    finally:
+        conn.close()
+
+
 @router.get("/logs")
 async def get_logs(tenant_id: str, limit: int = Query(50)):
     return db.get_query_logs(limit, tenant_id=tenant_id)
@@ -969,6 +1041,29 @@ async def delete_wiki(tenant_id: str, page_id: str):
     """Delete a wiki page. Agent will recreate it on next document process if needed."""
     db.delete_wiki_page(page_id, tenant_id=tenant_id)
     return {"status": "deleted", "page_id": page_id}
+
+
+@router.get("/schedule")
+async def get_schedule(tenant_id: str):
+    """Get scheduled re-training configuration."""
+    retrain_enabled = db.get_runtime_config("retrain_enabled", tenant_id=tenant_id)
+    retrain_interval = db.get_runtime_config("retrain_interval_days", tenant_id=tenant_id)
+    last_retrain = db.get_runtime_config("last_retrain", tenant_id=tenant_id)
+    return {
+        "retrain_enabled": retrain_enabled == "true" if retrain_enabled else False,
+        "retrain_interval_days": int(retrain_interval) if retrain_interval else 7,
+        "last_retrain": last_retrain if last_retrain else None,
+    }
+
+
+@router.put("/schedule")
+async def set_schedule(tenant_id: str, request: dict):
+    """Set scheduled re-training configuration."""
+    enabled = request.get("enabled", False)
+    interval = request.get("interval_days", 7)
+    db.set_runtime_config("retrain_enabled", str(enabled).lower(), tenant_id=tenant_id)
+    db.set_runtime_config("retrain_interval_days", str(interval), tenant_id=tenant_id)
+    return {"status": "saved", "retrain_enabled": enabled, "retrain_interval_days": interval}
 
 
 @router.post("/generate-persona")

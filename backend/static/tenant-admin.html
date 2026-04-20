@@ -444,6 +444,9 @@ input:focus,textarea:focus{outline:none;border-color:#007518;box-shadow:0 0 0 2p
                 </div>
             </div>
             <div style="display:flex;align-items:center;gap:8px">
+                <select id="tag-filter" onchange="activeTagFilter=this.value;renderDocTable()" style="padding:8px 12px;border:2px solid #383832;background:white;font-size:11px;font-weight:900;font-family:inherit;color:#383832;text-transform:uppercase;cursor:pointer;min-width:100px">
+                    <option value="">All Tags</option>
+                </select>
                 <div style="position:relative">
                     <span class="material-symbols-outlined" style="position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:16px;color:#65655e;z-index:1">search</span>
                     <input id="doc-search" oninput="handleDocSearch(this.value)" placeholder="Search docs..." style="background:white;border:2px solid #383832;padding:8px 12px 8px 32px;font-size:12px;color:#383832;width:260px;font-family:inherit;outline:none;font-weight:700" onfocus="this.style.borderColor='#007518';if(this.value.length>=3)document.getElementById('fts-results').style.display='block'" onblur="this.style.borderColor='#383832';setTimeout(()=>{const p=document.getElementById('fts-results');if(p)p.style.display='none'},200)">
@@ -451,6 +454,7 @@ input:focus,textarea:focus{outline:none;border-color:#007518;box-shadow:0 0 0 2p
                     <div id="fts-loading" style="display:none;position:absolute;right:8px;top:50%;transform:translateY(-50%)"><span class="material-symbols-outlined" style="font-size:14px;color:#65655e;animation:spin 1s linear infinite">progress_activity</span></div>
                 </div>
                 <button onclick="bulkTrain()" style="padding:6px 14px;background:#00fc40;border:2px solid #383832;color:#383832;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;transition:all 0.15s;text-transform:uppercase;box-shadow:2px 2px 0 #383832" onmousedown="this.style.transform='translate(1px,1px)';this.style.boxShadow='1px 1px 0 #383832'" onmouseup="this.style.transform='';this.style.boxShadow='2px 2px 0 #383832'" title="Train AI on all untrained documents"><span class="material-symbols-outlined" style="font-size:14px">model_training</span>Train All</button>
+                <button id="bulk-delete-btn" onclick="bulkDelete()" style="display:none;padding:6px 14px;background:#be2d06;border:2px solid #383832;color:white;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;align-items:center;gap:4px;text-transform:uppercase;box-shadow:2px 2px 0 #383832"><span class="material-symbols-outlined" style="font-size:14px">delete</span>Delete Selected</button>
                 <button onclick="bulkStandardize()" style="padding:6px 14px;background:#383832;border:none;color:#feffd6;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;transition:all 0.15s;text-transform:uppercase" onmouseover="this.style.background='#007518'" onmouseout="this.style.background='#383832'" title="Standardize all processed documents"><span class="material-symbols-outlined" style="font-size:14px">auto_fix_high</span>Standardize All</button>
             </div>
         </div>
@@ -458,6 +462,7 @@ input:focus,textarea:focus{outline:none;border-color:#007518;box-shadow:0 0 0 2p
             <table style="width:100%;text-align:left;border-collapse:collapse">
                 <thead>
                     <tr style="background:#ebe8dd;border-bottom:2px solid #383832">
+                        <th style="width:40px;padding:16px 12px"><input type="checkbox" id="select-all-docs" onchange="toggleSelectAll(this.checked)"></th>
                         <th style="padding:16px 32px;text-transform:uppercase;letter-spacing:0.1em;font-size:10px;font-weight:900;color:#383832">Filename</th>
                         <th style="padding:16px 32px;text-transform:uppercase;letter-spacing:0.1em;font-size:10px;font-weight:900;color:#383832">Status</th>
                         <th style="padding:16px 32px;text-transform:uppercase;letter-spacing:0.1em;font-size:10px;font-weight:900;color:#383832">Type</th>
@@ -466,7 +471,7 @@ input:focus,textarea:focus{outline:none;border-color:#007518;box-shadow:0 0 0 2p
                     </tr>
                 </thead>
                 <tbody id="doc-list" style="border-top:1px solid rgba(56,56,50,0.15)">
-                    <tr><td colspan="5" style="padding:40px;color:#65655e;font-size:13px;text-align:center">Loading documents...</td></tr>
+                    <tr><td colspan="7" style="padding:40px;color:#65655e;font-size:13px;text-align:center">Loading documents...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -620,6 +625,85 @@ input:focus,textarea:focus{outline:none;border-color:#007518;box-shadow:0 0 0 2p
 
 <!-- Logs Tab -->
 <div id="tab-logs" class="tab-content">
+    <!-- Analytics Dashboard -->
+    <div id="analytics-dashboard" style="margin-bottom:32px">
+        <!-- Stats Cards Row -->
+        <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-bottom:24px">
+            <div style="background:#ffffff;padding:24px;border-top:2px solid #383832;border-left:2px solid #383832;border-bottom:4px solid #383832;border-right:4px solid #383832;box-shadow:4px 4px 0px 0px #383832;display:flex;flex-direction:column;justify-content:space-between">
+                <span style="text-transform:uppercase;letter-spacing:0.1em;font-size:10px;font-weight:900;color:#65655e;margin-bottom:16px">Total Queries</span>
+                <div style="display:flex;align-items:baseline;gap:8px">
+                    <span id="analytics-total-queries" style="font-size:30px;font-weight:800;letter-spacing:-0.02em;color:#383832;font-family:'Space Grotesk',sans-serif">0</span>
+                </div>
+            </div>
+            <div style="background:#ffffff;padding:24px;border-top:2px solid #383832;border-left:2px solid #383832;border-bottom:4px solid #383832;border-right:4px solid #383832;box-shadow:4px 4px 0px 0px #383832;display:flex;flex-direction:column;justify-content:space-between">
+                <span style="text-transform:uppercase;letter-spacing:0.1em;font-size:10px;font-weight:900;color:#65655e;margin-bottom:16px">Avg Response Time</span>
+                <div style="display:flex;align-items:baseline;gap:8px">
+                    <span id="analytics-avg-response" style="font-size:30px;font-weight:800;letter-spacing:-0.02em;color:#383832;font-family:'Space Grotesk',sans-serif">--</span>
+                </div>
+            </div>
+            <div style="background:#ffffff;padding:24px;border-top:2px solid #383832;border-left:2px solid #383832;border-bottom:4px solid #383832;border-right:4px solid #383832;box-shadow:4px 4px 0px 0px #383832;display:flex;flex-direction:column;justify-content:space-between">
+                <span style="text-transform:uppercase;letter-spacing:0.1em;font-size:10px;font-weight:900;color:#65655e;margin-bottom:16px">Satisfaction Rate</span>
+                <div style="display:flex;align-items:baseline;gap:8px">
+                    <span id="analytics-satisfaction" style="font-size:30px;font-weight:800;letter-spacing:-0.02em;color:#007518;font-family:'Space Grotesk',sans-serif">--</span>
+                </div>
+            </div>
+            <div style="background:#ffffff;padding:24px;border-top:2px solid #383832;border-left:2px solid #383832;border-bottom:4px solid #383832;border-right:4px solid #383832;box-shadow:4px 4px 0px 0px #383832;display:flex;flex-direction:column;justify-content:space-between">
+                <span style="text-transform:uppercase;letter-spacing:0.1em;font-size:10px;font-weight:900;color:#65655e;margin-bottom:16px">Low Quality Answers</span>
+                <div style="display:flex;align-items:baseline;gap:8px">
+                    <span id="analytics-low-quality" style="font-size:30px;font-weight:800;letter-spacing:-0.02em;color:#be2d06;font-family:'Space Grotesk',sans-serif">0</span>
+                </div>
+            </div>
+        </div>
+        <!-- Response Time Chart (last 7 days) -->
+        <div style="background:#ffffff;padding:24px;border-top:2px solid #383832;border-left:2px solid #383832;border-bottom:4px solid #383832;border-right:4px solid #383832;box-shadow:4px 4px 0px 0px #383832;margin-bottom:24px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+                <h3 style="font-size:12px;font-weight:900;text-transform:uppercase;letter-spacing:0.1em;color:#383832;margin:0">Daily Query Volume (Last 7 Days)</h3>
+                <span style="font-size:9px;font-weight:700;color:#65655e;text-transform:uppercase;letter-spacing:0.05em">CSS Bar Chart</span>
+            </div>
+            <div id="analytics-daily-chart" style="display:flex;align-items:flex-end;gap:4px;height:100px;border-bottom:2px solid #383832;padding-bottom:8px">
+                <div style="flex:1;background:#ebe8dd;height:10%"></div>
+                <div style="flex:1;background:#ebe8dd;height:10%"></div>
+                <div style="flex:1;background:#ebe8dd;height:10%"></div>
+                <div style="flex:1;background:#ebe8dd;height:10%"></div>
+                <div style="flex:1;background:#ebe8dd;height:10%"></div>
+                <div style="flex:1;background:#ebe8dd;height:10%"></div>
+                <div style="flex:1;background:#ebe8dd;height:10%"></div>
+            </div>
+            <div id="analytics-daily-labels" style="display:flex;gap:4px;margin-top:8px">
+                <span style="flex:1;text-align:center;font-size:9px;font-weight:700;color:#65655e">--</span>
+                <span style="flex:1;text-align:center;font-size:9px;font-weight:700;color:#65655e">--</span>
+                <span style="flex:1;text-align:center;font-size:9px;font-weight:700;color:#65655e">--</span>
+                <span style="flex:1;text-align:center;font-size:9px;font-weight:700;color:#65655e">--</span>
+                <span style="flex:1;text-align:center;font-size:9px;font-weight:700;color:#65655e">--</span>
+                <span style="flex:1;text-align:center;font-size:9px;font-weight:700;color:#65655e">--</span>
+                <span style="flex:1;text-align:center;font-size:9px;font-weight:700;color:#65655e">--</span>
+            </div>
+        </div>
+        <!-- Two-column: Top Queries + Failed Queries -->
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:24px">
+            <!-- Top 10 Popular Queries -->
+            <div style="background:#ffffff;border-top:2px solid #383832;border-left:2px solid #383832;border-bottom:4px solid #383832;border-right:4px solid #383832;box-shadow:4px 4px 0px 0px #383832;overflow:hidden">
+                <div style="padding:14px 24px;background:#383832;display:flex;align-items:center;gap:8px">
+                    <span class="material-symbols-outlined" style="font-size:16px;color:#00fc40">trending_up</span>
+                    <span style="font-size:11px;font-weight:900;text-transform:uppercase;color:#feffd6;letter-spacing:0.05em">Top 10 Queries</span>
+                </div>
+                <div id="analytics-top-queries" style="max-height:300px;overflow-y:auto">
+                    <div style="padding:24px;text-align:center;color:#65655e;font-size:12px">Loading...</div>
+                </div>
+            </div>
+            <!-- Failed / Low Quality Queries -->
+            <div style="background:#ffffff;border-top:2px solid #383832;border-left:2px solid #383832;border-bottom:4px solid #383832;border-right:4px solid #383832;box-shadow:4px 4px 0px 0px #383832;overflow:hidden">
+                <div style="padding:14px 24px;background:#be2d06;display:flex;align-items:center;gap:8px">
+                    <span class="material-symbols-outlined" style="font-size:16px;color:#feffd6">warning</span>
+                    <span style="font-size:11px;font-weight:900;text-transform:uppercase;color:#feffd6;letter-spacing:0.05em">Failed / Low Quality</span>
+                </div>
+                <div id="analytics-failed-queries" style="max-height:300px;overflow-y:auto">
+                    <div style="padding:24px;text-align:center;color:#65655e;font-size:12px">Loading...</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Summary Bento -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:24px;margin-bottom:32px">
         <div style="background:#ffffff;padding:24px;border-top:2px solid #383832;border-left:2px solid #383832;border-bottom:4px solid #383832;border-right:4px solid #383832;box-shadow:4px 4px 0px 0px #383832;display:flex;flex-direction:column;justify-content:space-between">
@@ -902,6 +986,23 @@ Example auto-generated persona:
         </div>
     </div>
 
+    <!-- Scheduled Re-Training -->
+    <div style="background:white;border:2px solid #383832;padding:24px;margin-top:24px">
+        <h3 style="font-size:12px;font-weight:900;text-transform:uppercase;margin-bottom:16px">Scheduled Re-Training</h3>
+        <div style="display:flex;align-items:center;gap:16px">
+            <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+                <input type="checkbox" id="retrain-toggle" onchange="saveSchedule()">
+                <span style="font-size:13px;font-weight:700">Auto re-train documents</span>
+            </label>
+            <select id="retrain-interval" onchange="saveSchedule()" style="padding:6px;border:2px solid #383832;font-family:inherit;font-weight:700">
+                <option value="1">Daily</option>
+                <option value="7" selected>Weekly</option>
+                <option value="30">Monthly</option>
+            </select>
+        </div>
+        <p id="retrain-status" style="font-size:11px;color:#65655e;margin-top:8px"></p>
+    </div>
+
     <!-- Hidden elements for JS compatibility -->
     <div id="cfg-lang-grid" style="display:none"></div>
     <div id="cfg-tone-chips" style="display:none"></div>
@@ -1040,6 +1141,7 @@ function switchTab(name, btn) {
     if (titleEl) titleEl.textContent = tabTitles[name] || name;
     if (name === 'logs') loadLogs();
     if (name === 'chat') { initAdminChat(); loadChatContext(); }
+    if (name === 'config') loadSchedule();
 }
 
 async function loadChatContext() {
@@ -1258,12 +1360,22 @@ async function loadStats() {
 let allDocs = [];
 let docFilter = 'all';
 let docSearchTerm = '';
+let activeTagFilter = '';
 function renderDocTable() {
     let filtered = docFilter === 'all' ? allDocs : docFilter === 'processed' ? allDocs.filter(d => d.department && d.department !== 'Uploaded') : allDocs.filter(d => !d.department || d.department === 'Uploaded');
     // Search filter
     if (docSearchTerm) {
         filtered = filtered.filter(d => d.sop_id.toLowerCase().includes(docSearchTerm) || (d.department||'').toLowerCase().includes(docSearchTerm) || (d.title||'').toLowerCase().includes(docSearchTerm));
     }
+    // Tag filter
+    if (activeTagFilter) {
+        filtered = filtered.filter(d => {
+            const tags = Array.isArray(d.tags) ? d.tags : [];
+            return tags.map(t => t.toLowerCase()).includes(activeTagFilter.toLowerCase());
+        });
+    }
+    // Sort pinned docs first
+    filtered.sort((a,b) => (b.pinned?1:0) - (a.pinned?1:0));
     const tbody = document.getElementById('doc-list');
     // Update filter button styles
     ['all','processed','pending'].forEach(f => {
@@ -1271,7 +1383,7 @@ function renderDocTable() {
         if(btn) { btn.style.background = f===docFilter?'#383832':'transparent'; btn.style.color = f===docFilter?'#feffd6':'#65655e'; btn.style.fontWeight = f===docFilter?'900':'700'; }
     });
     if(!filtered.length) {
-        tbody.innerHTML = `<tr><td colspan="5" style="padding:40px;color:#65655e;font-size:13px;text-align:center">${docFilter==='all'?'No documents yet. Upload your first document above.':'No '+docFilter+' documents.'}</td></tr>`;
+        tbody.innerHTML = `<tr><td colspan="7" style="padding:40px;color:#65655e;font-size:13px;text-align:center">${docFilter==='all'?'No documents yet. Upload your first document above.':'No '+docFilter+' documents.'}</td></tr>`;
         document.getElementById('doc-count-label').textContent = '0 documents';
         return;
     }
@@ -1297,8 +1409,10 @@ function renderDocTable() {
         ) : '';
         const dlBtns = hasStd ? `<button onclick="event.stopPropagation();window.open(API+'/sops/${d.sop_id}/download/docx','_blank')" style="padding:6px 8px;border-radius:0;background:transparent;border:none;color:#007518;cursor:pointer;transition:all 0.15s" title="Download DOCX"><span class="material-symbols-outlined" style="font-size:16px">download</span></button>` : '';
         const scoreBadge = sopScore > 0 ? `<span style="font-size:10px;font-weight:900;padding:2px 8px;background:${sopScore>=80?'#007518':sopScore>=60?'#ff9d00':'#be2d06'};color:white;text-transform:uppercase">${sopScore}/100</span>` : '';
+        const pinStar = `<span onclick="event.stopPropagation();togglePin('${d.sop_id}')" style="cursor:pointer;color:${d.pinned?'#ff9d00':'#ebe8dd'};font-size:18px" class="material-symbols-outlined">${d.pinned?'star':'star_border'}</span>`;
         return `<tr data-sopid="${d.sop_id}" style="border-bottom:1px solid rgba(56,56,50,0.1);transition:background 0.15s;cursor:pointer" onclick="openPreview('${d.sop_id}')" onmouseover="this.style.background='#fcf9ef'" onmouseout="this.style.background='white'">
-            <td style="padding:20px 32px"><div style="display:flex;align-items:center;gap:16px"><div style="width:40px;height:40px;border-radius:0;background:${iconBg};display:flex;align-items:center;justify-content:center"><span class="material-symbols-outlined" style="color:${iconColor}">${icon}</span></div><div><span style="font-size:14px;font-weight:600;color:#383832;display:block">${esc(d.sop_id)}</span><span style="font-size:10px;color:#65655e">${esc(d.department||'Uploaded')} ${scoreBadge}</span>${d.created_at?`<span style="font-size:9px;color:#65655e;display:block;margin-top:2px">${d.created_at.split('T')[0]}${d.indexed_at?' · Trained: '+d.indexed_at.split('T')[0]:''}${d.standardized_at?' · Standardized: '+d.standardized_at.split('T')[0]:''}</span>`:''}</div></div></td>
+            <td style="padding:20px 12px;width:40px"><input type="checkbox" class="doc-checkbox" value="${d.sop_id}" onclick="event.stopPropagation();updateBulkActions()"></td>
+            <td style="padding:20px 32px"><div style="display:flex;align-items:center;gap:12px">${pinStar}<div style="width:40px;height:40px;border-radius:0;background:${iconBg};display:flex;align-items:center;justify-content:center"><span class="material-symbols-outlined" style="color:${iconColor}">${icon}</span></div><div><span style="font-size:14px;font-weight:600;color:#383832;display:block">${esc(d.sop_id)}</span><span style="font-size:10px;color:#65655e">${esc(d.department||'Uploaded')} ${scoreBadge}</span>${d.created_at?`<span style="font-size:9px;color:#65655e;display:block;margin-top:2px">${d.created_at.split('T')[0]}${d.indexed_at?' · Trained: '+d.indexed_at.split('T')[0]:''}${d.standardized_at?' · Standardized: '+d.standardized_at.split('T')[0]:''}</span>`:''}</div></div></td>
             <td style="padding:20px 32px">${statusHtml}</td>
             <td style="padding:20px 32px"><span style="font-size:12px;color:#65655e">${typeLabel}</span></td>
             <td style="padding:20px 32px"><span style="font-size:12px;font-weight:500;color:#383832">${d.page_count||0}p</span></td>
@@ -1306,6 +1420,73 @@ function renderDocTable() {
         </tr>`;
     }).join('');
     document.getElementById('doc-count-label').textContent = `Showing ${filtered.length} of ${allDocs.length} documents`;
+    // Reset select-all checkbox
+    const selectAll = document.getElementById('select-all-docs');
+    if (selectAll) selectAll.checked = false;
+    updateBulkActions();
+}
+
+// ── Pin/Star Documents ──────────────────────────────────────────────────
+async function togglePin(id) {
+    await fetch(`${API}/sops/${id}/pin`, {method:'PUT', headers:headers()});
+    await loadDocs();
+}
+
+// ── Bulk Delete ─────────────────────────────────────────────────────────
+function toggleSelectAll(checked) {
+    document.querySelectorAll('.doc-checkbox').forEach(cb => { cb.checked = checked; });
+    updateBulkActions();
+}
+function updateBulkActions() {
+    const checked = document.querySelectorAll('.doc-checkbox:checked');
+    const btn = document.getElementById('bulk-delete-btn');
+    if (btn) {
+        btn.style.display = checked.length > 0 ? 'flex' : 'none';
+        btn.textContent = '';
+        btn.innerHTML = `<span class="material-symbols-outlined" style="font-size:14px">delete</span>Delete ${checked.length} Selected`;
+    }
+}
+async function bulkDelete() {
+    const checked = [...document.querySelectorAll('.doc-checkbox:checked')].map(c => c.value);
+    if (!checked.length) return;
+    if (!confirm(`Delete ${checked.length} document(s)? All training data will be permanently lost.`)) return;
+    for (const id of checked) {
+        await fetch(`${API}/sops/${id}`, {method:'DELETE', headers:headers()});
+    }
+    await loadDocs(); await loadStats();
+}
+
+// ── Document Tagging ────────────────────────────────────────────────────
+async function addTag(sopId, tag) {
+    if (!tag || !tag.trim()) return;
+    tag = tag.trim().toLowerCase();
+    const doc = allDocs.find(d => d.sop_id === sopId);
+    if (!doc) return;
+    const tags = Array.isArray(doc.tags) ? [...doc.tags] : [];
+    if (tags.includes(tag)) return;
+    tags.push(tag);
+    await fetch(`${API}/sops/${sopId}`, {method:'PUT', headers:{...headers(),'Content-Type':'application/json'}, body:JSON.stringify({tags:tags})});
+    await loadDocs();
+    if (currentDetailId === sopId) openDocDetail(sopId);
+}
+async function removeTag(sopId, tag) {
+    const doc = allDocs.find(d => d.sop_id === sopId);
+    if (!doc) return;
+    const tags = (Array.isArray(doc.tags) ? [...doc.tags] : []).filter(t => t !== tag);
+    await fetch(`${API}/sops/${sopId}`, {method:'PUT', headers:{...headers(),'Content-Type':'application/json'}, body:JSON.stringify({tags:tags})});
+    await loadDocs();
+    if (currentDetailId === sopId) openDocDetail(sopId);
+}
+function populateTagFilter() {
+    const allTags = new Set();
+    allDocs.forEach(d => {
+        const tags = Array.isArray(d.tags) ? d.tags : [];
+        tags.forEach(t => { if (t) allTags.add(t); });
+    });
+    const sel = document.getElementById('tag-filter');
+    if (!sel) return;
+    const current = sel.value;
+    sel.innerHTML = '<option value="">All Tags</option>' + [...allTags].sort().map(t => `<option value="${esc(t)}" ${t===current?'selected':''}>${esc(t)}</option>`).join('');
 }
 
 // ── Full-Text Search ────────────────────────────────────────────────────
@@ -1381,12 +1562,13 @@ async function loadDocs() {
     const pEl = document.getElementById('doc-stat-pages'); if(pEl) pEl.textContent = docs.reduce((a,d)=>a+(d.page_count||0),0);
     const eEl = document.getElementById('doc-stat-embeds'); if(eEl) { try { const s = await (await fetch(`${API}/stats`,{headers:headers()})).json(); eEl.textContent = (s.total_embeddings||0).toLocaleString(); } catch{} }
     if (!docs.length) {
-        document.getElementById('doc-list').innerHTML = '<tr><td colspan="5" style="padding:40px;color:#65655e;font-size:13px;text-align:center">No documents yet. Upload your first document above.</td></tr>';
+        document.getElementById('doc-list').innerHTML = '<tr><td colspan="7" style="padding:40px;color:#65655e;font-size:13px;text-align:center">No documents yet. Upload your first document above.</td></tr>';
         document.getElementById('doc-count-label').textContent = '0 documents';
         document.getElementById('dash-doc-tbody').innerHTML = '<tr><td colspan="4" style="padding:24px;color:#65655e;font-size:13px;text-align:center">No documents yet. Upload your first document to begin.</td></tr>';
         return;
     }
     renderDocTable();
+    populateTagFilter();
     // SOP Quality Analytics
     const scored = docs.filter(d => d.sop_score > 0);
     const sopPanel = document.getElementById('dash-sop-quality');
@@ -1450,7 +1632,84 @@ async function loadDocs() {
 
 let logsPage = 1;
 const LOGS_PER_PAGE = 10;
+
+async function loadAnalytics() {
+    try {
+        const data = await (await fetch(`${API}/analytics`, {headers:headers()})).json();
+        if (data.error) return;
+        // Stats cards
+        const totalEl = document.getElementById('analytics-total-queries');
+        if (totalEl) totalEl.textContent = (data.total_queries || 0).toLocaleString();
+        // Avg response time from daily data
+        const avgEl = document.getElementById('analytics-avg-response');
+        if (avgEl) {
+            const durations = (data.daily || []).filter(d => d.avg_duration > 0).map(d => d.avg_duration);
+            if (durations.length) {
+                const avg = durations.reduce((a,b) => a+b, 0) / durations.length;
+                avgEl.textContent = (avg * 1000).toFixed(0) + 'ms';
+            } else { avgEl.textContent = '--'; }
+        }
+        // Satisfaction rate
+        const satEl = document.getElementById('analytics-satisfaction');
+        if (satEl) {
+            const up = data.thumbs_up || 0;
+            const down = data.thumbs_down || 0;
+            if (up + down > 0) {
+                satEl.textContent = Math.round(up / (up + down) * 100) + '%';
+            } else { satEl.textContent = 'N/A'; }
+        }
+        // Low quality count
+        const lowEl = document.getElementById('analytics-low-quality');
+        if (lowEl) lowEl.textContent = (data.low_quality_count || 0).toString();
+        // Daily chart (pure CSS bars)
+        const chartEl = document.getElementById('analytics-daily-chart');
+        const labelsEl = document.getElementById('analytics-daily-labels');
+        if (chartEl && data.daily && data.daily.length) {
+            const maxCount = Math.max(...data.daily.map(d => d.count), 1);
+            chartEl.innerHTML = data.daily.map(d => {
+                const pct = Math.max(5, Math.round(d.count / maxCount * 100));
+                return `<div style="flex:1;background:#00fc40;height:${pct}%;border-top:2px solid #383832;position:relative" title="${d.day}: ${d.count} queries"><span style="position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:900;color:#383832">${d.count}</span></div>`;
+            }).join('');
+            labelsEl.innerHTML = data.daily.map(d => {
+                const day = new Date(d.day + 'T00:00:00');
+                return `<span style="flex:1;text-align:center;font-size:9px;font-weight:700;color:#65655e">${day.toLocaleDateString('en-US',{weekday:'short'})}</span>`;
+            }).join('');
+        }
+        // Top queries table
+        const topEl = document.getElementById('analytics-top-queries');
+        if (topEl && data.top_queries && data.top_queries.length) {
+            topEl.innerHTML = data.top_queries.map((q, i) => {
+                const question = (q.question || '').replace(/</g, '&lt;');
+                return `<div style="padding:10px 24px;border-bottom:1px solid rgba(56,56,50,0.1);display:flex;align-items:center;gap:12px">
+                    <span style="font-size:11px;font-weight:900;color:#65655e;min-width:20px">${i+1}.</span>
+                    <span style="font-size:12px;color:#383832;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${question}</span>
+                    <span style="font-size:11px;font-weight:900;background:#383832;color:#feffd6;padding:2px 8px;min-width:28px;text-align:center">${q.count}</span>
+                </div>`;
+            }).join('');
+        } else if (topEl) {
+            topEl.innerHTML = '<div style="padding:24px;text-align:center;color:#65655e;font-size:12px">No queries recorded yet</div>';
+        }
+        // Failed queries
+        const failEl = document.getElementById('analytics-failed-queries');
+        if (failEl && data.low_quality && data.low_quality.length) {
+            failEl.innerHTML = data.low_quality.map(q => {
+                const question = (q.question || '').replace(/</g, '&lt;');
+                const score = q.quality_score != null ? q.quality_score : '--';
+                const fb = q.feedback === 'down' ? '<span class="material-symbols-outlined" style="font-size:14px;color:#be2d06;font-variation-settings:\'FILL\' 1">thumb_down</span>' : '';
+                return `<div style="padding:10px 24px;border-bottom:1px solid rgba(56,56,50,0.1);display:flex;align-items:center;gap:12px">
+                    <span style="font-size:12px;color:#383832;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${question}</span>
+                    <span style="font-size:10px;font-weight:900;background:#be2d06;color:white;padding:2px 6px">${score}</span>
+                    ${fb}
+                </div>`;
+            }).join('');
+        } else if (failEl) {
+            failEl.innerHTML = '<div style="padding:24px;text-align:center;color:#65655e;font-size:12px">No low-quality answers detected</div>';
+        }
+    } catch(e) { console.error('Analytics load error:', e); }
+}
+
 async function loadLogs() {
+    loadAnalytics();
     try { const logs = await (await fetch(`${API}/logs`, {headers:headers()})).json();
     const totalEl = document.getElementById('log-total-queries');
     if(totalEl) totalEl.textContent = logs.length.toLocaleString();
@@ -1610,6 +1869,7 @@ async function handleFiles(files) {
 let processingId = null;
 async function processDoc(id) {
     if (processingId) { alert('Another document is already being trained. Please wait.'); return; }
+    if (Notification.permission === 'default') Notification.requestPermission();
     processingId = id;
     // Immediately show progress bar on the row
     renderDocTable();
@@ -1619,9 +1879,9 @@ async function processDoc(id) {
         if (row) {
             const actionsCell = row.querySelector('td:last-child');
             if (actionsCell && !actionsCell.querySelector('.train-progress')) {
-                actionsCell.innerHTML = `<div class="train-progress" style="width:140px">
+                actionsCell.innerHTML = `<div class="train-progress" style="width:180px">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                        <span style="font-size:9px;font-weight:900;text-transform:uppercase;color:#007518"><span id="train-pct-${id}">5</span>% Training</span>
+                        <span style="font-size:9px;font-weight:900;text-transform:uppercase;color:#007518"><span id="train-pct-${id}">5</span>% Training · <span id="train-eta-${id}"></span></span>
                         <button onclick="event.stopPropagation();stopTraining('${id}')" style="font-size:8px;background:none;border:none;color:#be2d06;cursor:pointer;font-weight:900;text-transform:uppercase;font-family:inherit">STOP</button>
                     </div>
                     <div style="background:#ebe8dd;height:6px;border:1px solid #383832;overflow:hidden"><div id="train-bar-${id}" style="height:100%;background:#00fc40;width:5%;transition:width 0.5s"></div></div>
@@ -1654,6 +1914,20 @@ async function processDoc(id) {
     // Try SSE streaming endpoint first, fall back to polling
     let streamed = false;
     let _trainStepCount = 0;
+    const _trainStartTime = Date.now();
+    const _docPageCount = (allDocs.find(d => d.sop_id === id)?.page_count) || 5;
+    const _totalEstSec = _docPageCount * 15;
+    // Show initial ETA
+    setTimeout(() => {
+        const etaEl = document.getElementById('train-eta-' + id);
+        if (etaEl) etaEl.textContent = _totalEstSec >= 60 ? '~' + Math.ceil(_totalEstSec/60) + 'm left' : '~' + _totalEstSec + 's left';
+    }, 60);
+
+    function _formatEta(sec) {
+        if (sec <= 0) return 'Complete!';
+        if (sec >= 60) return '~' + Math.floor(sec/60) + 'm ' + Math.round(sec%60) + 's left';
+        return '~' + Math.round(sec) + 's left';
+    }
     try {
         const resp = await fetch(`${API}/process/${id}/stream`, {method:'POST', headers:headers()});
         if (resp.ok && resp.headers.get('content-type')?.includes('text/event-stream')) {
@@ -1695,12 +1969,35 @@ async function processDoc(id) {
                             if (bar) bar.style.width = pct + '%';
                             const pctEl = document.getElementById('train-pct-' + id);
                             if (pctEl) pctEl.textContent = pct;
+                            // Update ETA
+                            const elapsed = (Date.now() - _trainStartTime) / 1000;
+                            const avgPerStep = elapsed / _trainStepCount;
+                            const totalSteps = Math.ceil(95 / 4); // ~24 steps to reach 95%
+                            const remaining = Math.max(0, (totalSteps - _trainStepCount) * avgPerStep);
+                            const etaEl = document.getElementById('train-eta-' + id);
+                            if (etaEl) etaEl.textContent = _formatEta(remaining);
                         } else if (eventType === 'done') {
                             const bar = document.getElementById('train-bar-' + id);
                             if (bar) bar.style.width = '100%';
                             const pctEl = document.getElementById('train-pct-' + id);
                             if (pctEl) pctEl.textContent = '100';
+                            const etaEl = document.getElementById('train-eta-' + id);
+                            if (etaEl) etaEl.textContent = 'Complete!';
                             appendLog('SUCCESS', '#34d399', 'All pipeline steps completed. Document indexed and trained.');
+                            // Browser notification
+                            const docName = allDocs.find(d => d.sop_id === id)?.title || id;
+                            if (Notification.permission === 'granted') {
+                                new Notification("Training Complete", {body: docName + " is ready", icon: "/favicon.svg"});
+                            }
+                            // Completion beep
+                            try {
+                                const ctx = new AudioContext();
+                                const osc = ctx.createOscillator();
+                                osc.connect(ctx.destination);
+                                osc.frequency.value = 800;
+                                osc.start();
+                                setTimeout(() => osc.stop(), 150);
+                            } catch(e) {}
                         } else if (eventType === 'error') {
                             appendLog('ERROR', '#ffb4ab', payload.error || 'Pipeline error');
                         }
@@ -1833,6 +2130,13 @@ async function openDocDetail(sopId) {
                         <div style="padding:12px 16px;border-right:1px solid rgba(56,56,50,0.15)"><span style="font-size:9px;font-weight:900;text-transform:uppercase;color:#65655e">CREATED</span><div style="font-size:13px;font-weight:700;color:#383832;margin-top:4px">${(doc.created_at||'').split('T')[0]||'—'}</div></div>
                         <div style="padding:12px 16px;border-right:1px solid rgba(56,56,50,0.15)"><span style="font-size:9px;font-weight:900;text-transform:uppercase;color:#65655e">TRAINED</span><div style="font-size:13px;font-weight:700;color:#383832;margin-top:4px">${(doc.indexed_at||'').split('T')[0]||'—'}</div></div>
                         <div style="padding:12px 16px"><span style="font-size:9px;font-weight:900;text-transform:uppercase;color:#65655e">STANDARDIZED</span><div style="font-size:13px;font-weight:700;color:#383832;margin-top:4px">${(doc.standardized_at||'').split('T')[0]||'—'} ${score>0?'('+score+'/100)':''}</div></div>
+                    </div>
+                </div>
+                <div style="border:2px solid #383832;box-shadow:4px 4px 0 #383832;background:white">
+                    <div style="padding:8px 16px;background:#383832;color:#feffd6;font-size:12px;font-weight:900;text-transform:uppercase">TAGS</div>
+                    <div style="padding:12px 16px;display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+                        ${(Array.isArray(doc.tags)?doc.tags:[]).map(t => `<span style="display:inline-flex;align-items:center;gap:4px;padding:4px 10px;background:#ebe8dd;border:2px solid #383832;font-size:11px;font-weight:700;color:#383832;text-transform:uppercase">${esc(t)} <span onclick="removeTag('${sopId}','${esc(t)}')" style="cursor:pointer;color:#be2d06;font-weight:900;font-size:14px;line-height:1">&times;</span></span>`).join('')}
+                        <input placeholder="Add tag..." style="padding:4px 10px;border:2px solid #383832;background:white;font-size:11px;font-weight:700;font-family:inherit;width:120px" onkeydown="if(event.key==='Enter'){event.preventDefault();addTag('${sopId}',this.value);this.value='';}">
                     </div>
                 </div>
                 ${keywords.length ? `<div style="border:2px solid #383832;box-shadow:4px 4px 0 #383832;background:white">
@@ -2492,6 +2796,22 @@ function updateSidebarLogo(url) {
         var src = url || '/static/logo.svg';
         topEl.innerHTML = '<img src="' + src.replace(/"/g,'&quot;') + '" style="width:100%;height:100%;object-fit:contain">';
     }
+}
+
+async function loadSchedule() {
+    try {
+        const res = await fetch(`${API}/schedule`, {headers:headers()});
+        const data = await res.json();
+        document.getElementById('retrain-toggle').checked = data.retrain_enabled;
+        document.getElementById('retrain-interval').value = data.retrain_interval_days;
+        document.getElementById('retrain-status').textContent = data.last_retrain ? 'Last re-training: ' + data.last_retrain.split('T')[0] : 'Never re-trained';
+    } catch(e) {}
+}
+async function saveSchedule() {
+    try {
+        await fetch(`${API}/schedule`, {method:'PUT', headers:{'Content-Type':'application/json',...headers()}, body:JSON.stringify({enabled:document.getElementById('retrain-toggle').checked, interval_days:parseInt(document.getElementById('retrain-interval').value)})});
+        document.getElementById('retrain-status').textContent = 'Schedule saved.';
+    } catch(e) {}
 }
 
 async function saveConfig() {

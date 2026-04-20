@@ -373,6 +373,11 @@ def _create_tables_in_current_schema(conn):
         conn.execute("ALTER TABLE sops ADD COLUMN IF NOT EXISTS previous_version_id TEXT DEFAULT NULL")
     except Exception:
         pass
+    # Migrate: add pinned column to sops
+    try:
+        conn.execute("ALTER TABLE sops ADD COLUMN IF NOT EXISTS pinned BOOLEAN DEFAULT FALSE")
+    except Exception:
+        pass
 
 
 def _ensure_monitoring_tables(conn):

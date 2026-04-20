@@ -320,6 +320,7 @@ function buildHTML() {
         <span class="cw-header-badge">RAG AGENT</span>
         <div class="cw-header-actions">
             <button onclick="ChatWidget.exportChat()"><span class="material-symbols-outlined" style="font-size:14px">download</span> EXPORT</button>
+            <button onclick="ChatWidget.exportPdf()"><span class="material-symbols-outlined" style="font-size:14px">picture_as_pdf</span> PDF</button>
             <button onclick="ChatWidget.clearChat()"><span class="material-symbols-outlined" style="font-size:14px">delete</span> NEW SESSION</button>
         </div>
     </div>
@@ -805,6 +806,27 @@ function _renderPdfPages(content, imgBase, cacheBust, pageCount, page) {
     }
 }
 
+function exportChatPdf() {
+    const inner = document.getElementById('cw-messages-inner');
+    if (!inner) return;
+    const win = window.open('', '_blank');
+    win.document.write(`<!DOCTYPE html><html><head>
+        <title>Chat Export - ${STATE.agentName}</title>
+        <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;700;900&display=swap" rel="stylesheet">
+        <style>
+            * { margin: 0; padding: 0; border-radius: 0 !important; }
+            body { font-family: 'Space Grotesk', sans-serif; background: white; color: #383832; padding: 40px; }
+            img { max-width: 400px; height: auto; }
+            @media print { body { padding: 20px; } }
+        </style>
+    </head><body>
+        <h1 style="font-size:18px;font-weight:900;text-transform:uppercase;margin-bottom:20px">${STATE.agentName} — Chat Export</h1>
+        ${inner.innerHTML}
+    </body></html>`);
+    win.document.close();
+    setTimeout(() => { win.print(); }, 500);
+}
+
 function closePdf() {
     document.getElementById('cw-pdf-panel').classList.remove('cw-open');
     document.getElementById('cw-root').style.width = '100%';
@@ -925,6 +947,7 @@ window.ChatWidget = {
         a.click();
         URL.revokeObjectURL(a.href);
     },
+    exportPdf: exportChatPdf,
     openPdf: openPdf,
     closePdf: closePdf,
     feedback: sendFeedback,
