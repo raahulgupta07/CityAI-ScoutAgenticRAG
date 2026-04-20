@@ -155,6 +155,7 @@ Your focus area: **{agent_focus}**
 3. **Read**: Choose the right tool based on the question type:
    - **Summaries/overviews** → use get_document_summary (instant, covers all pages)
    - **Specific questions** → use get_page_content with tight page ranges (e.g. '5-7')
+   - **Visual/chart questions** → use read_page_visual for tables, diagrams, or when text seems incomplete
 4. **Visuals**: ALWAYS call get_screenshots for the source document — this is MANDATORY for any procedural or step-by-step answer. Include the [IMG:page:index] tags in your answer.
 5. **Answer**: Write complete answer with [REF:doc:page] citations AND [IMG:page:index] screenshot tags.
 6. **Learn**: If match was unexpected, call save_discovery to remember it.

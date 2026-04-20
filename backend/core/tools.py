@@ -379,6 +379,56 @@ def make_tools(tenant_id: str = None) -> list:
                                pages=pages, reason=reason, source="discovered", tenant_id=tenant_id)
         return f"Saved: '{query}' → {document_id} (pages {pages})."
 
+    @tool(description="Visually read a PDF page by sending the actual page image to AI vision. Use this when text extraction seems incomplete, or when the user asks about charts, tables, diagrams, or visual elements on a specific page.")
+    def read_page_visual(sop_id: str, page_number: int) -> str:
+        """Read a PDF page using AI vision for detailed content extraction."""
+        _report("vision_read", f"read_page_visual('{sop_id}', {page_number})", "Reading page visually with AI")
+        try:
+            import fitz
+            import base64
+            from backend.core.config import get_openrouter_client, VISION_MODEL
+
+            sop = db.get_sop(sop_id, tenant_id=tenant_id)
+            if not sop or not sop.get("pdf_path"):
+                return f"Document {sop_id} not found or has no PDF."
+
+            pdf_path = db.resolve_pdf_path(sop.get("pdf_path", ""))
+            if not pdf_path:
+                from pathlib import Path
+                pdf_path = str(Path(f"/data/tenants/{tenant_id}/uploads") / Path(sop.get("pdf_path", "")).name)
+
+            doc = fitz.open(pdf_path)
+            try:
+                if page_number < 1 or page_number > len(doc):
+                    return f"Page {page_number} out of range (document has {len(doc)} pages)."
+
+                page = doc[page_number - 1]
+                mat = fitz.Matrix(200/72, 200/72)  # 200 DPI
+                pix = page.get_pixmap(matrix=mat)
+                img_bytes = pix.tobytes("png")
+                b64 = base64.b64encode(img_bytes).decode("utf-8")
+            finally:
+                doc.close()
+
+            client = get_openrouter_client()
+            response = client.chat.completions.create(
+                model=VISION_MODEL,
+                messages=[{
+                    "role": "user",
+                    "content": [
+                        {"type": "text", "text": f"Read this document page carefully. Extract ALL text, tables, diagrams, charts, and visual elements. Describe what you see in detail. Document: {sop_id}, Page: {page_number}"},
+                        {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}", "detail": "high"}}
+                    ]
+                }],
+                max_tokens=2000,
+                temperature=0,
+            )
+
+            content = response.choices[0].message.content or ""
+            return f"[Visual reading of {sop_id} page {page_number}]\n{content}"
+        except Exception as e:
+            return f"Error reading page visually: {e}"
+
     return [search_intents, search_wiki, vector_search_tool, search_documents,
             list_all_documents, get_document_summary, get_page_content, get_screenshots,
-            get_source_overview, save_discovery, save_negative]
+            get_source_overview, save_discovery, save_negative, read_page_visual]

@@ -360,6 +360,35 @@ def process_pdf(pdf_path: str, sop_id: Optional[str] = None, on_status: Optional
     except Exception as e:
         _status("embedding_error", f"Embedding error: {e}")
 
+    # ── Step 7b: Feed standardized content into embeddings if available ──
+    sop_data = db.get_sop(sop_id, tenant_id=tenant_id)
+    std_json = sop_data.get("standardized_json") if sop_data else None
+    if std_json:
+        if isinstance(std_json, str):
+            try: std_json = json.loads(std_json)
+            except: std_json = None
+        if std_json and std_json.get("procedure"):
+            _status("embedding", "Adding standardized procedure steps to embeddings...")
+            std_texts = []
+            for step in std_json.get("procedure", []):
+                step_text = f"Step {step.get('step_number', '')}: {step.get('title', '')}\n{step.get('activity', '')}\nVerification: {step.get('verification', '')}"
+                std_texts.append(step_text)
+            if std_texts:
+                from backend.core.config import get_openrouter_client, EMBEDDING_MODEL
+                client = get_openrouter_client()
+                for i in range(0, len(std_texts), 20):
+                    batch = std_texts[i:i+20]
+                    try:
+                        resp = client.embeddings.create(model=EMBEDDING_MODEL, input=batch)
+                        for j, emb in enumerate(resp.data):
+                            db.upsert_embedding(sop_id=sop_id, page=900+i+j, chunk_index=0,
+                                content=batch[j][:500], embedding=emb.embedding,
+                                metadata={"sop_id": sop_id, "page": 900+i+j, "source": "standardized"},
+                                tenant_id=tenant_id)
+                    except: pass
+                embedded_count += len(std_texts)
+                _status("embedding", f"Added {len(std_texts)} standardized procedure embeddings")
+
     # ── Step 8: Compliance check ────────────────────────────────────────
     _status("compliance", "Running compliance check...")
     try:
