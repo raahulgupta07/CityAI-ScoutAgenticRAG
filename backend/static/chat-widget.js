@@ -840,11 +840,11 @@ window.ChatWidget = {
         });
 
         // Restore previous session
-        restoreMessages();
+        const hasRestoredSession = restoreMessages();
 
         // Load starter question cards from trained Q&A pairs
-        // Show on welcome screen (visible when no conversation active)
-        if (STATE.tenantId) {
+        // Only show when welcome screen is visible (no restored conversation)
+        if (STATE.tenantId && !hasRestoredSession) {
             const starterUrl = '/api/t/' + STATE.tenantId + '/admin/starter-questions?limit=4';
             fetch(starterUrl).then(r => r.ok ? r.json() : []).then(questions => {
                 const container = document.getElementById('cw-starter-cards');

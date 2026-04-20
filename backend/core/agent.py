@@ -479,6 +479,19 @@ def ask(
                         "height": img.get("height", 0),
                     }
 
+        # Auto-inject [IMG:page:index] tags for cited pages if agent didn't include them
+        if not img_tags and image_map:
+            cited_pages = set()
+            for ref_match in re.finditer(r'\[REF:[^\]:]+:(\d+)', answer):
+                cited_pages.add(int(ref_match.group(1)))
+            if cited_pages:
+                injected = []
+                for key, img_info in image_map.items():
+                    if img_info["page"] in cited_pages and len(injected) < 3:
+                        injected.append(f"[IMG:{img_info['page']}:{img_info['index']}]")
+                if injected:
+                    answer += "\n\n" + "\n".join(injected)
+
     # Track usage
     if tenant_id:
         try:
@@ -541,13 +554,8 @@ Rules:
 - Return ONLY a JSON array of strings"""
 
     try:
-        resp = client.chat.completions.create(
-            model=ROUTER_MODEL,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.7,
-            max_tokens=200,
-        )
-        raw = resp.choices[0].message.content.strip()
+        from backend.core.config import call_openrouter
+        raw = call_openrouter(prompt, model=ROUTER_MODEL, max_tokens=200, temperature=0.7)
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
