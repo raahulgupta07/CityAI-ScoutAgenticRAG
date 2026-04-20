@@ -508,31 +508,9 @@ def process_and_train(pdf_path: str, sop_id: str, on_status=None, tenant_id: str
     train_result = train_on_document(sop_id, tenant_id=tenant_id, on_status=_notify)
     train_time = round(time.time() - t2, 1)
 
-    # ── SOP Standardization + Re-embed with standardized content ──
-    # Runs for ALL documents (not just SOP mode) — any doc benefits from structured content
+    # Standardization removed from auto-pipeline — run manually via STANDARDIZE button
+    # This reduces 429 rate limit errors and speeds up training by ~30s
     std_result = None
-    if tenant_id:
-        try:
-            time.sleep(5)  # Cool down before heavy standardization LLM call
-            _log("step", "━━━ SOP STANDARDIZATION ━━━", "Generating Tier-1 consulting DOCX")
-            _notify("sop_standardization", "SOP Standardization: generating structured DOCX")
-            t3 = time.time()
-            from backend.core.sop_standardize import standardize_sop
-            std_result = standardize_sop(sop_id, tenant_id=tenant_id, on_status=on_pipeline_status)
-            std_time = round(time.time() - t3, 1)
-
-            if std_result and "error" not in std_result:
-                _log("done", f"SOP standardized: score {std_result.get('score', 0)}/100 ({std_time}s)")
-
-                # ── Feed standardized content BACK into agent's knowledge ──
-                _log("step", "━━━ RE-EMBEDDING WITH STANDARDIZED CONTENT ━━━")
-                _notify("re_embedding", "Re-embedding with standardized content")
-                _update_pages_with_standardized(sop_id, tenant_id)
-                _log("done", "Agent now uses standardized content for answers")
-            else:
-                _log("error", f"SOP standardize error: {std_result.get('error', '?')}")
-        except Exception as e:
-            _log("error", f"Standardization failed: {e}")
 
     # ── Wiki Synthesis — cross-document knowledge layer ──
     wiki_result = None
