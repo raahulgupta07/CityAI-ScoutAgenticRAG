@@ -2602,7 +2602,7 @@ async function standardizeDoc(id) {
         }
         await loadDocs();
     } catch(e) {
-        logLine('ERROR', '#f95630', e.message);
+        if (e.message && !e.message.includes('Unexpected token')) logLine('ERROR', '#f95630', e.message);
     } finally {
         standardizingIds.delete(id);
         renderDocTable(); // Re-render to restore button
