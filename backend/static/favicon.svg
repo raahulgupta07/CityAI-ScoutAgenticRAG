@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" fill="#383832" rx="4"/>
+  <!-- Antenna -->
+  <line x1="16" y1="2" x2="16" y2="6" stroke="#00fc40" stroke-width="1.5"/>
+  <circle cx="16" cy="2" r="1.5" fill="#00fc40"/>
+  <!-- Head -->
+  <rect x="7" y="6" width="18" height="12" fill="#feffd6" stroke="#00fc40" stroke-width="1"/>
+  <!-- Eyes -->
+  <rect x="10" y="9" width="4" height="4" fill="#383832"/>
+  <rect x="18" y="9" width="4" height="4" fill="#383832"/>
+  <rect x="11" y="10" width="1.5" height="1.5" fill="#00fc40"/>
+  <rect x="19" y="10" width="1.5" height="1.5" fill="#00fc40"/>
+  <!-- Mouth -->
+  <rect x="11" y="15" width="10" height="1.5" fill="#00fc40"/>
+  <!-- Ears -->
+  <rect x="4" y="8" width="3" height="6" fill="#00fc40"/>
+  <rect x="25" y="8" width="3" height="6" fill="#00fc40"/>
+  <!-- Body -->
+  <rect x="9" y="20" width="14" height="9" fill="#feffd6" stroke="#00fc40" stroke-width="1"/>
+  <rect x="13" y="22" width="6" height="4" fill="#383832"/>
+  <rect x="15" y="23" width="2" height="2" fill="#00fc40"/>
+  <!-- Feet -->
+  <rect x="10" y="29" width="4" height="2" fill="#00fc40"/>
+  <rect x="18" y="29" width="4" height="2" fill="#00fc40"/>
+</svg>

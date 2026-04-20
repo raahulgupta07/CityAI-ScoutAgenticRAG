@@ -1,0 +1,72 @@
+# ============================================================================
+# Document Intelligence Agent — Docker Compose
+# ============================================================================
+# 2 containers: API (+ frontend), Database
+# Everything served on single port from one container.
+#
+# Quick start:
+#   cp .env.example .env  # Edit with real values
+#   docker compose up -d --build
+# ============================================================================
+
+services:
+  # --------------------------------------------------------------------------
+  # PostgreSQL + pgvector
+  # --------------------------------------------------------------------------
+  db:
+    image: pgvector/pgvector:pg18-trixie
+    container_name: scoutrag-db
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql
+      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    environment:
+      POSTGRES_USER: ${DB_USER:-scoutrag}
+      POSTGRES_PASSWORD: ${DB_PASS:-scoutrag_secret}
+      POSTGRES_DB: ${DB_DATABASE:-scoutragdb}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-scoutrag}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - scoutrag
+
+  # --------------------------------------------------------------------------
+  # FastAPI + Frontend (single container, single port)
+  # --------------------------------------------------------------------------
+  api:
+    container_name: scoutrag-api
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${PORT:-80}:8000"
+    volumes:
+      - scoutrag-data:/data
+    environment:
+      DATABASE_URL: postgresql+psycopg://${DB_USER:-scoutrag}:${DB_PASS:-scoutrag_secret}@db:5432/${DB_DATABASE:-scoutragdb}
+      OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Set OPENROUTER_API_KEY in .env}
+      WAIT_FOR_DB: "true"
+    env_file:
+      - .env
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - scoutrag
+
+networks:
+  scoutrag:
+    driver: bridge
+
+volumes:
+  pgdata:
+  scoutrag-data:

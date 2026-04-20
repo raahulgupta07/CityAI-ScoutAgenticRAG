@@ -1,0 +1,173 @@
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════
+   BRUTALIST / INDUSTRIAL / NEWSPAPER DESIGN SYSTEM
+   Based on CityBCPAgent design.md — sharp corners, stamp shadows,
+   ink borders, warm yellow surface, all-caps industrial labels.
+   ═══════════════════════════════════════════════════════════════ */
+
+/* GLOBAL: Zero border-radius everywhere — brutalist sharp corners */
+* { border-radius: 0px !important; }
+
+@theme {
+  --font-headline: 'Space Grotesk', sans-serif;
+  --font-body: 'Space Grotesk', sans-serif;
+  --font-label: 'Space Grotesk', sans-serif;
+
+  /* ── Surface palette (newspaper yellow) ───────────────────── */
+  --color-surface: #feffd6;
+  --color-surface-low: #fcf9ef;
+  --color-surface-container: #f6f4e9;
+  --color-surface-high: #f1eee3;
+  --color-surface-highest: #ebe8dd;
+  --color-surface-white: #ffffff;
+
+  /* ── Ink / text ───────────────────────────────────────────── */
+  --color-on-surface: #383832;
+  --color-on-surface-variant: #65655e;
+  --color-outline: #828179;
+  --color-outline-variant: #bbb9b1;
+
+  /* ── Semantic colors ──────────────────────────────────────── */
+  --color-primary: #007518;
+  --color-primary-container: #00fc40;
+  --color-secondary: #006f7c;
+  --color-secondary-container: #26e6ff;
+  --color-tertiary: #9d4867;
+  --color-tertiary-container: #fe97b9;
+  --color-error: #be2d06;
+  --color-error-container: #f95630;
+  --color-warning: #ff9d00;
+}
+
+body {
+  font-family: 'Space Grotesk', sans-serif;
+  background: var(--color-surface);
+  color: var(--color-on-surface);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── Material Symbols ────────────────────────────────────────── */
+.material-symbols-outlined {
+  font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+  vertical-align: middle;
+}
+
+/* ── Selection ───────────────────────────────────────────────── */
+::selection { background: #007518; color: white; }
+
+/* ── Utility Classes ─────────────────────────────────────────── */
+
+/* Asymmetric ink border — heavier bottom/right like letterpress */
+.ink-border {
+  border-top: 2px solid #383832;
+  border-left: 2px solid #383832;
+  border-bottom: 4px solid #383832;
+  border-right: 4px solid #383832;
+}
+
+/* Hard stamp shadow — no blur, like a rubber stamp */
+.stamp-shadow {
+  box-shadow: 4px 4px 0px 0px #383832;
+}
+
+/* Small stamp shadow for compact elements */
+.stamp-shadow-sm {
+  box-shadow: 3px 3px 0px 0px #383832;
+}
+
+/* Dark tag label — used for all field names, section titles */
+.tag-label {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 10px;
+  font-weight: 900;
+  text-transform: uppercase;
+  background: #383832;
+  color: #feffd6;
+}
+
+/* Dark title bar — used for table headers, card headers */
+.dark-title-bar {
+  padding: 8px 16px;
+  background: #383832;
+  color: #feffd6;
+  font-weight: 900;
+  text-transform: uppercase;
+  font-size: 0.875rem;
+  letter-spacing: 0.05em;
+}
+
+/* Active tab state */
+.tab-active {
+  background: #383832;
+  color: #feffd6;
+}
+
+/* ── Scrollbar ───────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--color-surface-container); }
+::-webkit-scrollbar-thumb { background: var(--color-on-surface); }
+
+/* ── Chat Prose ──────────────────────────────────────────────── */
+.prose-chat p { margin: 0.4em 0; }
+.prose-chat ul, .prose-chat ol { padding-left: 1.25em; margin: 0.5em 0; }
+.prose-chat li { margin: 0.2em 0; }
+.prose-chat strong { font-weight: 700; color: #383832; }
+.prose-chat code {
+  background: #ebe8dd;
+  padding: 1px 6px;
+  font-size: 0.85em;
+  font-family: monospace;
+}
+
+/* ── Animations ──────────────────────────────────────────────── */
+
+/* Fade up (general entrance) */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-up { animation: fadeUp 0.3s ease-out; }
+
+/* Toast slide in from right */
+@keyframes slide-in {
+  from { transform: translateX(100%); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+.animate-slide-in { animation: slide-in 0.3s ease-out; }
+
+/* Section stagger — children fade in sequentially */
+@keyframes sectionFadeIn {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.section-animate > * {
+  opacity: 0;
+  animation: sectionFadeIn 0.4s ease-out forwards;
+}
+.section-animate > *:nth-child(1) { animation-delay: 0.05s; }
+.section-animate > *:nth-child(2) { animation-delay: 0.15s; }
+.section-animate > *:nth-child(3) { animation-delay: 0.25s; }
+.section-animate > *:nth-child(4) { animation-delay: 0.35s; }
+.section-animate > *:nth-child(5) { animation-delay: 0.45s; }
+.section-animate > *:nth-child(6) { animation-delay: 0.55s; }
+.section-animate > *:nth-child(7) { animation-delay: 0.65s; }
+.section-animate > *:nth-child(8) { animation-delay: 0.75s; }
+.section-animate > *:nth-child(n+9) { animation-delay: 0.85s; }
+
+/* Skeleton loading pulse */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+.skeleton {
+  background: #ebe8dd;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+/* Thinking dots bounce */
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}

@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg">
+    <title>Chat</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&display=swap" rel="stylesheet" />
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; border-radius: 0 !important; }
+        body { font-family: 'Space Grotesk', sans-serif; background: #feffd6; height: 100vh; overflow: hidden; }
+        #chat-container { height: 100vh; display: flex; }
+    </style>
+</head>
+<body>
+<div id="chat-container"></div>
+<script src="/static/chat-widget.js"></script>
+<script>
+    const base = (typeof api !== 'undefined' ? api : null) || window.location.origin;
+    ChatWidget.init({
+        mode: 'public',
+        container: document.getElementById('chat-container'),
+        chatApi: '/api/chat',
+        feedbackApi: '/api/chat/feedback',
+        tenantId: typeof TENANT_ID !== 'undefined' ? TENANT_ID : '',
+        agentName: 'Document Agent',
+        logoUrl: typeof LOGO_URL !== 'undefined' ? LOGO_URL : '',
+        escalation: null,
+    });
+</script>
+</body>
+</html>

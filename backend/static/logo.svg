@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120">
+  <!-- Background -->
+  <rect width="120" height="120" fill="#383832"/>
+
+  <!-- Antenna -->
+  <line x1="60" y1="12" x2="60" y2="24" stroke="#00fc40" stroke-width="3" stroke-linecap="square"/>
+  <circle cx="60" cy="10" r="4" fill="#00fc40"/>
+
+  <!-- Head -->
+  <rect x="30" y="24" width="60" height="42" fill="#feffd6" stroke="#00fc40" stroke-width="3"/>
+
+  <!-- Eyes -->
+  <rect x="42" y="36" width="12" height="12" fill="#383832"/>
+  <rect x="66" y="36" width="12" height="12" fill="#383832"/>
+  <!-- Eye shine -->
+  <rect x="44" y="38" width="4" height="4" fill="#00fc40"/>
+  <rect x="68" y="38" width="4" height="4" fill="#00fc40"/>
+
+  <!-- Mouth - happy smile -->
+  <rect x="44" y="54" width="32" height="4" fill="#00fc40"/>
+  <rect x="44" y="54" width="4" height="4" fill="#00fc40"/>
+  <rect x="72" y="54" width="4" height="4" fill="#00fc40"/>
+  <rect x="48" y="58" width="24" height="3" fill="#00fc40"/>
+
+  <!-- Ears -->
+  <rect x="20" y="32" width="10" height="18" fill="#00fc40"/>
+  <rect x="90" y="32" width="10" height="18" fill="#00fc40"/>
+
+  <!-- Body -->
+  <rect x="36" y="70" width="48" height="30" fill="#feffd6" stroke="#00fc40" stroke-width="3"/>
+
+  <!-- Body screen / chest panel -->
+  <rect x="46" y="76" width="28" height="14" fill="#383832"/>
+  <!-- Heart / power dot -->
+  <rect x="56" y="80" width="8" height="6" fill="#00fc40"/>
+
+  <!-- Arms -->
+  <rect x="22" y="72" width="12" height="6" fill="#feffd6" stroke="#00fc40" stroke-width="2"/>
+  <rect x="86" y="72" width="12" height="6" fill="#feffd6" stroke="#00fc40" stroke-width="2"/>
+
+  <!-- Feet -->
+  <rect x="38" y="100" width="16" height="8" fill="#00fc40"/>
+  <rect x="66" y="100" width="16" height="8" fill="#00fc40"/>
+</svg>

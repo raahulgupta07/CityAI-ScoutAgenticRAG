@@ -1,0 +1,118 @@
+# ============================================================
+# INSTANCE CONFIGURATION
+# Change this file to deploy for any team/department.
+# No code changes needed — just edit and rebuild.
+# ============================================================
+
+# ── App Branding ─────────────────────────────────────────────
+app:
+  name: "Document Agentic RAG"
+  tagline: "Intelligent Curator"
+  description: "AI-powered document intelligence agent with self-learning RAG"
+  icon: "hub"                    # Material Symbols icon name
+  primary_color: "#1a237e"       # Sidebar + accents
+  # logo_url: "/static/logo.png" # Optional: custom logo instead of icon
+
+# ── Agent Persona ────────────────────────────────────────────
+agent:
+  name: "Document Agent"
+  role: "document intelligence assistant"
+  focus: "all organizational documents — policies, guides, manuals, reports, procedures, forms"
+  personality: "professional, precise, proactive"
+  languages:
+    - English
+    - Burmese
+
+# ── Document Categories ──────────────────────────────────────
+# Suggested categories for AI classification.
+# The AI can still create new ones — these are hints.
+categories:
+  - infrastructure/cloud
+  - infrastructure/network
+  - enterprise/odoo
+  - enterprise/sap
+  - digital-product/city-platform
+  - government/immigration
+  - policy/hr
+  - policy/security
+  - guide/onboarding
+  - data-bi/reports
+  - energy/bcp
+  - legal/compliance
+  - pmo
+
+# ── Document Types ───────────────────────────────────────────
+document_types:
+  - configuration
+  - troubleshooting
+  - setup
+  - daily-operations
+  - incident-management
+  - access-management
+  - policy
+  - guide
+  - report
+  - certificate
+  - form
+  - framework
+  - plan
+  - extract
+
+# ── Widget ───────────────────────────────────────────────────
+widget:
+  title: "Document Assistant"
+  welcome: "Hi! I can help you find information from our document library. What are you looking for?"
+  placeholder: "Ask about any procedure, policy, or document..."
+
+# ── Examples ─────────────────────────────────────────────────
+# Shown in chat as quick-start suggestions
+example_questions:
+  - "What documents do we have?"
+  - "Show me all policies"
+  - "How do I complete this process?"
+  - "Summarize this document"
+
+
+# ============================================================
+# EXAMPLE: HR Policy Hub deployment
+# ============================================================
+# app:
+#   name: "HR Policy Hub"
+#   tagline: "Policy Intelligence"
+#   description: "AI-powered HR policy and compliance assistant"
+#   icon: "policy"
+#   primary_color: "#1b5e20"
+#
+# agent:
+#   name: "HR Policy Agent"
+#   role: "HR policy expert and compliance advisor"
+#   focus: "HR policies, employee handbooks, leave procedures, compensation guides, compliance documents"
+#   personality: "helpful, empathetic, compliance-aware"
+#   languages:
+#     - English
+#     - Burmese
+#
+# categories:
+#   - policy/leave
+#   - policy/compensation
+#   - policy/conduct
+#   - policy/safety
+#   - handbook/employee
+#   - handbook/manager
+#   - compliance/labor-law
+#   - compliance/data-privacy
+#   - guide/onboarding
+#   - guide/offboarding
+#   - form/request
+#   - form/approval
+#
+# widget:
+#   title: "HR Assistant"
+#   welcome: "Hi! I can help you find HR policies and procedures. What do you need?"
+#   placeholder: "Ask about leave policy, benefits, onboarding..."
+#
+# example_questions:
+#   - "What is the annual leave policy?"
+#   - "How do I submit a resignation?"
+#   - "What are the maternity leave benefits?"
+#   - "Show me the employee code of conduct"

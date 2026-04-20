@@ -1,0 +1,30 @@
+# Environment & secrets
+.env
+*.env.local
+
+# Data
+data/
+/db/pgdata/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+.venv/
+venv/
+
+# Frontend
+frontend/node_modules/
+frontend/.svelte-kit/
+
+# Widget
+widget/node_modules/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
