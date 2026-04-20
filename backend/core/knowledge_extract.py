@@ -91,12 +91,13 @@ def extract_knowledge(sop_id: str, tenant_id: str = None) -> dict:
         raw = call_openrouter(
             prompt=context,
             model=ROUTER_MODEL,
-            max_tokens=16000,
+            max_tokens=8000,
             temperature=0,
             messages=[
                 {"role": "system", "content": EXTRACT_PROMPT},
                 {"role": "user", "content": context},
             ],
+            max_retries=5,
         )
         raw = raw.strip()
         if raw.startswith("```"):

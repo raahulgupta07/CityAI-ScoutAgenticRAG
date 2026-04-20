@@ -297,7 +297,7 @@ def process_pdf(pdf_path: str, sop_id: Optional[str] = None, on_status: Optional
 
     # Brief pause to avoid OpenRouter rate limits between LLM-heavy steps
     import time as _time
-    _time.sleep(2)
+    _time.sleep(3)
 
     # ── Step 5a: Enhance documentation ───────────────────────────────────
     _status("enhancing", "Enhancing documentation (text + screenshots → steps)...")
@@ -330,13 +330,23 @@ def process_pdf(pdf_path: str, sop_id: Optional[str] = None, on_status: Optional
 
     update_category_counts(tenant_id=tenant_id)
 
-    _time.sleep(2)  # Rate limit pause
+    _time.sleep(3)  # Rate limit pause
 
     # ── Step 6: Extract knowledge ────────────────────────────────────────
     _status("extracting_knowledge", "Extracting Q&A pairs and search keywords...")
     try:
         from backend.core.knowledge_extract import extract_knowledge
-        extract_knowledge(sop_id, tenant_id=tenant_id)
+        knowledge_result = extract_knowledge(sop_id, tenant_id=tenant_id)
+        if knowledge_result and knowledge_result.get("error"):
+            _status("extracting_knowledge", f"Knowledge extraction failed: {knowledge_result['error']} — retrying...")
+            _time.sleep(5)  # Wait longer before retry
+            knowledge_result = extract_knowledge(sop_id, tenant_id=tenant_id)
+            if knowledge_result and knowledge_result.get("error"):
+                _status("extracting_knowledge", f"Knowledge extraction failed again: {knowledge_result['error']}")
+            else:
+                _status("extracting_knowledge", f"Q&A extracted: {knowledge_result.get('qa_pairs', 0)} pairs, {knowledge_result.get('search_keywords', 0)} keywords")
+        else:
+            _status("extracting_knowledge", f"Q&A extracted: {knowledge_result.get('qa_pairs', 0)} pairs, {knowledge_result.get('search_keywords', 0)} keywords")
     except Exception as e:
         _status("extracting_knowledge", f"Knowledge extraction error: {e}")
 
