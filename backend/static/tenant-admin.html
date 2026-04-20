@@ -1611,13 +1611,17 @@ async function handleFiles(files) {
     if (uploaded.length > 0) {
         logLine('TRAIN', '#007518', `Auto-training ${uploaded.length} newly uploaded document(s)...`);
         for (const d of uploaded) {
+            processingId = d.sop_id;
+            renderDocTable();  // Show STOP button on current doc
             logLine('TRAIN', '#007518', `Training ${esc(d.sop_id)}...`);
             try {
                 await fetch(`${API}/process/${d.sop_id}/stream`, {method:'POST', headers:headers()});
+                logLine('SUCCESS', '#00fc40', `${esc(d.sop_id)}: Training complete`);
             } catch(e) {
                 logLine('ERROR', '#f95630', `${esc(d.sop_id)}: ${e.message}`);
             }
         }
+        processingId = null;
         await loadDocs(); await loadStats();
     }
 }
