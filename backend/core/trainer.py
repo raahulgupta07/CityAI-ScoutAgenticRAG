@@ -353,7 +353,7 @@ def _run_discovery_phase(sop_id: str, title: str, agent, tenant_id: str = None) 
     return discoveries
 
 
-def train_on_document(sop_id: str, tenant_id: str = None) -> dict:
+def train_on_document(sop_id: str, tenant_id: str = None, on_status=None) -> dict:
     """
     Auto-train the Agno agent on a document by running its Q&A pairs.
     Uses parallel execution (3 concurrent) for speed.
@@ -377,8 +377,14 @@ def train_on_document(sop_id: str, tenant_id: str = None) -> dict:
         return {"error": "No Q&A pairs to train on"}
 
     title = sop.get("title", sop_id)
-    _log("info", f"Training on: {title}", f"{len(qa_pairs)} Q&A pairs (parallel)")
-    _training_status = {"running": True, "sop_id": sop_id, "progress": 0, "total": len(qa_pairs)}
+    total_qa = len(qa_pairs)
+    _log("info", f"Training on: {title}", f"{total_qa} Q&A pairs")
+    _training_status = {"running": True, "sop_id": sop_id, "progress": 0, "total": total_qa}
+
+    def _sub(msg):
+        if on_status:
+            try: on_status("training_sub", msg)
+            except: pass
 
     from backend.core.agent import get_agent
     agent = get_agent(tenant_id)
@@ -391,13 +397,12 @@ def train_on_document(sop_id: str, tenant_id: str = None) -> dict:
     with ThreadPoolExecutor(max_workers=BATCH_SIZE) as executor:
         futures = {}
         for i, qa in enumerate(qa_pairs):
-            # qa_pairs can be list of dicts {"question":"...", "answer":"..."} or list of strings
             question = qa.get("question", qa) if isinstance(qa, dict) else str(qa)
             if not question or not isinstance(question, str):
                 continue
             future = executor.submit(
                 _run_single_training_query,
-                agent, sop_id, title, question, i + 1, len(qa_pairs)
+                agent, sop_id, title, question, i + 1, total_qa
             )
             futures[future] = i
 
@@ -406,19 +411,25 @@ def train_on_document(sop_id: str, tenant_id: str = None) -> dict:
             results.append(result)
             completed += 1
             _training_status["progress"] = completed
+            status_icon = "✓" if result.get("status") == "learned" else "~"
+            q_preview = result.get('question', '')[:60]
+            _log("info", f"  [{completed}/{total_qa}] {status_icon} {q_preview}")
+            _sub(f"Training Q&A [{completed}/{total_qa}]: {q_preview}")
 
     # Summary
     learned = sum(1 for r in results if r.get("status") == "learned")
     partial = sum(1 for r in results if r.get("status") == "partial")
     errors = sum(1 for r in results if r.get("status") == "error")
 
-    _log("done", f"Training complete: {learned} learned, {partial} partial, {errors} errors", sop_id)
+    _log("done", f"Training: {learned} learned, {partial} partial, {errors} errors out of {total_qa}", sop_id)
+    _sub(f"Training complete: {learned} learned, {partial} partial")
 
     # ── Self-Learning Discovery Phase ──
-    # Generate diverse keyword queries and force save_discovery for each
     _log("step", "━━━ SELF-LEARNING DISCOVERY ━━━", "Building intent routes from document")
+    _sub("Self-learning discovery: generating diverse queries...")
     discoveries = _run_discovery_phase(sop_id, title, agent, tenant_id=tenant_id)
-    _log("done", f"Discovery complete: {discoveries} new intent routes saved", sop_id)
+    _log("done", f"Discovery: {discoveries} new intent routes saved", sop_id)
+    _sub(f"Discovery complete: {discoveries} intent routes saved")
 
     _training_status = {"running": False, "sop_id": sop_id, "progress": len(qa_pairs), "total": len(qa_pairs)}
 
@@ -481,7 +492,7 @@ def process_and_train(pdf_path: str, sop_id: str, on_status=None, tenant_id: str
     _log("step", "━━━ AUTO-TRAINING ━━━", "Teaching agent about new document")
     _notify("auto_training", "Auto-training: teaching agent about new document")
     t2 = time.time()
-    train_result = train_on_document(sop_id, tenant_id=tenant_id)
+    train_result = train_on_document(sop_id, tenant_id=tenant_id, on_status=_notify)
     train_time = round(time.time() - t2, 1)
 
     # ── SOP Standardization + Re-embed with standardized content ──
