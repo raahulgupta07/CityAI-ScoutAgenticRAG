@@ -1628,9 +1628,14 @@ async function handleFiles(files) {
 
 let processingId = null;
 async function processDoc(id) {
-    if (processingId) return; // Already processing
+    if (processingId) { alert('Another document is already being trained. Please wait.'); return; }
     processingId = id;
-    renderDocTable(); // Show disabled state
+    // Immediately update the button on the clicked row before anything else
+    const row = document.querySelector(`tr[data-sopid="${id}"]`);
+    if (row) {
+        const actionsCell = row.querySelector('td:last-child');
+        if (actionsCell) actionsCell.innerHTML = `<div style="display:flex;align-items:center;gap:4px"><button onclick="event.stopPropagation();stopTraining('${id}')" style="padding:6px 12px;border-radius:0;background:#be2d06;border:2px solid #383832;color:white;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;text-transform:uppercase;box-shadow:2px 2px 0 #383832"><span class="material-symbols-outlined" style="font-size:14px;animation:spin 1s linear infinite">progress_activity</span>Stop</button></div>`;
+    }
     const lp = document.getElementById('log-panel');
     lp.innerHTML = '';
     logLine('INFO', '#00fc40', `<span style="color:#007518;font-weight:700">━━━ PIPELINE START ━━━</span>`);
