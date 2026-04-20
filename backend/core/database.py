@@ -811,7 +811,7 @@ def upsert_sop(sop: dict, tenant_id: str = None):
             "summary_detailed": sop.get("summary_detailed", ""),
             "caveats": json.dumps(sop.get("caveats", []) if isinstance(sop.get("caveats"), list) else []),
             "search_text": search_text,
-            "indexed_at": sop.get("indexed_at", datetime.now().isoformat()),
+            "indexed_at": sop.get("indexed_at"),
         })
         conn.commit()
     finally:
