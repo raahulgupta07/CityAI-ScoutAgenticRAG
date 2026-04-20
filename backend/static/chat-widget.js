@@ -869,12 +869,16 @@ window.ChatWidget = {
         }
 
         // Scroll-to-bottom button visibility
-        // Click on chat area (not on PDF panel) closes PDF panel
-        document.getElementById('cw-root').addEventListener('click', (e) => {
+        // Click on empty chat area closes PDF panel (but not on citations/badges/buttons)
+        STATE.messagesEl.addEventListener('click', (e) => {
             const panel = document.getElementById('cw-pdf-panel');
-            if (panel && panel.classList.contains('cw-open') && !panel.contains(e.target)) {
-                closePdf();
-            }
+            if (!panel || !panel.classList.contains('cw-open')) return;
+            // Don't close if clicking on interactive elements that open PDF
+            const tag = e.target.tagName;
+            const cl = e.target.className || '';
+            if (e.target.closest('.cw-cite-ref, .cw-source-badge, .cw-ref-thumb, .cw-screenshot, .cw-ref-pages, [onclick*="openPdf"]')) return;
+            if (tag === 'SUP' || tag === 'SPAN' || tag === 'IMG') return;
+            closePdf();
         });
 
         STATE.messagesEl.addEventListener('scroll', () => {
