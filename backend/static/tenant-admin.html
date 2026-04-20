@@ -1879,12 +1879,15 @@ async function processDoc(id) {
         if (row) {
             const actionsCell = row.querySelector('td:last-child');
             if (actionsCell && !actionsCell.querySelector('.train-progress')) {
-                actionsCell.innerHTML = `<div class="train-progress" style="width:180px">
+                const steps = ['CAT','VIS','SCR','ENH','SAVE','Q&A','EMB','CHK','TRAIN','WIKI'];
+                const stepsHtml = steps.map((s,i) => `<div id="ts-${id}-${i}" style="font-size:7px;font-weight:900;padding:2px 3px;background:#ebe8dd;color:#65655e;text-align:center;border:1px solid #383832;transition:all 0.3s">${s}</div>`).join('');
+                actionsCell.innerHTML = `<div class="train-progress" style="width:260px">
                     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                        <span style="font-size:9px;font-weight:900;text-transform:uppercase;color:#007518"><span id="train-pct-${id}">5</span>% Training · <span id="train-eta-${id}"></span></span>
+                        <span style="font-size:9px;font-weight:900;text-transform:uppercase;color:#007518"><span id="train-pct-${id}">5</span>% · <span id="train-eta-${id}"></span></span>
                         <button onclick="event.stopPropagation();stopTraining('${id}')" style="font-size:8px;background:none;border:none;color:#be2d06;cursor:pointer;font-weight:900;text-transform:uppercase;font-family:inherit">STOP</button>
                     </div>
-                    <div style="background:#ebe8dd;height:6px;border:1px solid #383832;overflow:hidden"><div id="train-bar-${id}" style="height:100%;background:#00fc40;width:5%;transition:width 0.5s"></div></div>
+                    <div style="display:flex;gap:2px;margin-bottom:4px">${stepsHtml}</div>
+                    <div style="background:#ebe8dd;height:4px;border:1px solid #383832;overflow:hidden"><div id="train-bar-${id}" style="height:100%;background:#00fc40;width:5%;transition:width 0.5s"></div></div>
                 </div>`;
             }
         }
@@ -1961,8 +1964,17 @@ async function processDoc(id) {
                             const color = levelColors[level]||'#dee3ea';
                             const tag = levelTags[level]||'INFO';
                             appendLog(tag, color, msg);
+                            // Light up step tracker based on step name
+                            const stepMap = {categoriz:0, vision:1, extract:2, enhanc:3, saving:4, sav:4, knowledge:5, qa:5, embed:6, compli:7, compliance:7, auto_train:8, training:8, wiki:9, discovery:8};
+                            const sl = step.toLowerCase();
+                            for (const [key, idx] of Object.entries(stepMap)) {
+                                if (sl.includes(key)) {
+                                    const el = document.getElementById('ts-' + id + '-' + idx);
+                                    if (el) { el.style.background = '#007518'; el.style.color = 'white'; el.style.borderColor = '#007518'; }
+                                    break;
+                                }
+                            }
                             // Update progress bar
-                            if (typeof _trainStepCount === 'undefined') _trainStepCount = 0;
                             _trainStepCount++;
                             const pct = Math.min(95, _trainStepCount * 4);
                             const bar = document.getElementById('train-bar-' + id);
