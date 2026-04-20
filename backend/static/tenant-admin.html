@@ -499,8 +499,7 @@ input:focus,textarea:focus{outline:none;border-color:#007518;box-shadow:0 0 0 2p
                     <p id="dd-meta" style="font-size:11px;color:#ebe8dd;margin:4px 0 0 0"></p>
                 </div>
                 <div style="display:flex;gap:8px" id="dd-actions">
-                    <button onclick="processDoc(currentDetailId)" style="padding:6px 14px;background:#00fc40;border:2px solid #feffd6;color:#383832;font-size:10px;font-weight:900;text-transform:uppercase;cursor:pointer;font-family:'Space Grotesk',sans-serif">RE-TRAIN</button>
-                    <button onclick="standardizeDoc(currentDetailId)" style="padding:6px 14px;background:transparent;border:2px solid #feffd6;color:#feffd6;font-size:10px;font-weight:900;text-transform:uppercase;cursor:pointer;font-family:'Space Grotesk',sans-serif">STANDARDIZE</button>
+                    <button id="dd-std-btn" onclick="standardizeDoc(currentDetailId)" style="padding:6px 14px;background:transparent;border:2px solid #feffd6;color:#feffd6;font-size:10px;font-weight:900;text-transform:uppercase;cursor:pointer;font-family:'Space Grotesk',sans-serif">STANDARDIZE</button>
                     <button onclick="window.open(API+'/sops/'+currentDetailId+'/download/docx','_blank')" style="padding:6px 14px;background:transparent;border:2px solid #feffd6;color:#feffd6;font-size:10px;font-weight:900;text-transform:uppercase;cursor:pointer;font-family:'Space Grotesk',sans-serif;display:flex;align-items:center;gap:4px"><span class="material-symbols-outlined" style="font-size:14px">download</span>DOCX</button>
                 </div>
             </div>
@@ -2557,6 +2556,9 @@ async function standardizeDoc(id) {
     if (standardizingIds.has(id)) return; // Already running
     standardizingIds.add(id);
     renderDocTable(); // Re-render to show disabled state
+    // Show loading on detail view button too
+    const ddBtn = document.getElementById('dd-std-btn');
+    if (ddBtn) { ddBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px;animation:spin 1s linear infinite">progress_activity</span> STANDARDIZING...'; ddBtn.disabled = true; }
     const lp = document.getElementById('log-panel');
     logLine('DOC', '#006f7c', `<span style="color:#007518">━━━ DOCUMENT STANDARDIZATION ━━━</span>`);
     logLine('DOC', '#006f7c', `Document: <span style="color:#006f7c">${id}</span>`);
@@ -2584,6 +2586,8 @@ async function standardizeDoc(id) {
     } finally {
         standardizingIds.delete(id);
         renderDocTable(); // Re-render to restore button
+        const ddBtn2 = document.getElementById('dd-std-btn');
+        if (ddBtn2) { ddBtn2.innerHTML = 'STANDARDIZE'; ddBtn2.disabled = false; }
     }
 }
 
