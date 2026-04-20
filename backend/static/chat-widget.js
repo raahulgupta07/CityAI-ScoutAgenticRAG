@@ -869,8 +869,8 @@ window.ChatWidget = {
         }
 
         // Scroll-to-bottom button visibility
-        // Click on chat area closes PDF panel
-        STATE.messagesEl.addEventListener('click', (e) => {
+        // Click on chat area (not on PDF panel) closes PDF panel
+        document.getElementById('cw-root').addEventListener('click', (e) => {
             const panel = document.getElementById('cw-pdf-panel');
             if (panel && panel.classList.contains('cw-open') && !panel.contains(e.target)) {
                 closePdf();
