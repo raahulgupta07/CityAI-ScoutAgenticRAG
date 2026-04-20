@@ -36,10 +36,21 @@ AGENT_CONFIG = INSTANCE.get("agent", {})
 WIDGET_CONFIG = INSTANCE.get("widget", {})
 
 # ── Database ─────────────────────────────────────────────────────────────────
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql+psycopg://scoutrag:scoutrag_secret@localhost:5432/scoutragdb"
-)
+# Build DATABASE_URL from individual env vars (handles special chars in password)
+# Falls back to DATABASE_URL env var if set directly
+def _build_db_url():
+    explicit = os.getenv("DATABASE_URL")
+    if explicit:
+        return explicit
+    from urllib.parse import quote_plus
+    user = os.getenv("DB_USER", "scoutrag")
+    password = quote_plus(os.getenv("DB_PASS", "scoutrag_secret"))
+    host = os.getenv("DB_HOST", "db")
+    port = os.getenv("DB_PORT", "5432")
+    database = os.getenv("DB_DATABASE", "scoutragdb")
+    return f"postgresql+psycopg://{user}:{password}@{host}:{port}/{database}"
+
+DATABASE_URL = _build_db_url()
 
 # ── OpenRouter (single LLM gateway) ─────────────────────────────────────────
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY", "")

@@ -46,7 +46,7 @@ services:
     volumes:
       - scoutrag-data:/data
     environment:
-      DATABASE_URL: postgresql+psycopg://${DB_USER:-scoutrag}:${DB_PASS:-scoutrag_secret}@db:5432/${DB_DATABASE:-scoutragdb}
+      DB_HOST: db
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:?Set OPENROUTER_API_KEY in .env}
       WAIT_FOR_DB: "true"
     env_file:
