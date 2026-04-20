@@ -31,6 +31,7 @@
 .log-panel{background:#1a1a1a;padding:8px 12px;font-family:'SF Mono',Consolas,monospace;font-size:11px;color:#e0e0e0;max-height:150px;overflow-y:auto;line-height:1.5}
 .log-step{color:#ff9d00;font-weight:700}.log-info{color:#00fc40}.log-done{color:#00fc40;font-weight:700}.log-error{color:#f95630;font-weight:700}
 .tab-content{display:none}.tab-content.active{display:block}
+@media(max-width:1200px){#chat-left-panel{display:none!important}}
 input,textarea,select{padding:10px 14px;border:2px solid #383832;background:white;color:#383832;font-size:13px;font-family:'Space Grotesk',sans-serif;width:100%;font-weight:700}
 input:focus,textarea:focus{outline:none;border-color:#007518;box-shadow:0 0 0 2px rgba(0,117,24,0.15)}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -573,8 +574,8 @@ input:focus,textarea:focus{outline:none;border-color:#007518;box-shadow:0 0 0 2p
 <!-- Chat Tab -->
 <div id="tab-chat" class="tab-content">
     <div style="display:flex;gap:24px;height:calc(100vh - 160px)">
-        <!-- Left Panel: Context + Parameters -->
-        <section style="width:320px;flex-shrink:0;display:flex;flex-direction:column;gap:16px">
+        <!-- Left Panel: Context + Parameters (hidden when screen < 1200px) -->
+        <section id="chat-left-panel" style="width:280px;flex-shrink:0;display:flex;flex-direction:column;gap:16px;overflow-y:auto">
             <!-- Current Context -->
             <div style="background:#ffffff;padding:24px;border-top:2px solid #383832;border-left:2px solid #383832;border-bottom:4px solid #383832;border-right:4px solid #383832;box-shadow:4px 4px 0px 0px #383832">
                 <h3 style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;font-weight:900;color:#65655e;margin-bottom:16px">Current Context</h3>
