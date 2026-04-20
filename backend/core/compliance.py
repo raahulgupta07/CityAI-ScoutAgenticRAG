@@ -50,17 +50,18 @@ def check_compliance(sop_id: str, tenant_id: str = None) -> dict:
     context = f"Document: {sop_id}\nTitle: {sop.get('title', '')}\nDepartment: {sop.get('department', '')}\n\nContent:\n{text[:4000]}"
 
     try:
-        client = get_openrouter_client()
-        response = client.chat.completions.create(
+        from backend.core.config import call_openrouter
+        raw = call_openrouter(
+            prompt=context,
             model=ROUTER_MODEL,
+            max_tokens=500,
+            temperature=0,
             messages=[
                 {"role": "system", "content": COMPLIANCE_PROMPT},
                 {"role": "user", "content": context},
             ],
-            max_tokens=500,
-            temperature=0,
         )
-        raw = response.choices[0].message.content.strip()
+        raw = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):

@@ -295,6 +295,10 @@ def process_pdf(pdf_path: str, sop_id: Optional[str] = None, on_status: Optional
     except Exception as e:
         _status("extracting", f"Image extraction error: {e}")
 
+    # Brief pause to avoid OpenRouter rate limits between LLM-heavy steps
+    import time as _time
+    _time.sleep(2)
+
     # ── Step 5a: Enhance documentation ───────────────────────────────────
     _status("enhancing", "Enhancing documentation (text + screenshots → steps)...")
     enhance_stats = {}
@@ -325,6 +329,8 @@ def process_pdf(pdf_path: str, sop_id: Optional[str] = None, on_status: Optional
     }, tenant_id=tenant_id)
 
     update_category_counts(tenant_id=tenant_id)
+
+    _time.sleep(2)  # Rate limit pause
 
     # ── Step 6: Extract knowledge ────────────────────────────────────────
     _status("extracting_knowledge", "Extracting Q&A pairs and search keywords...")

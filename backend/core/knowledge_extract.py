@@ -85,19 +85,20 @@ def extract_knowledge(sop_id: str, tenant_id: str = None) -> dict:
     # Build context for LLM
     context = f"Document ID: {sop_id}\nTitle: {sop.get('title', '')}\nDepartment: {sop.get('department', '')}\n\nDocument content:\n{text[:10000]}"
 
-    # Call LLM
+    # Call LLM with retry
     try:
-        client = get_openrouter_client()
-        response = client.chat.completions.create(
+        from backend.core.config import call_openrouter
+        raw = call_openrouter(
+            prompt=context,
             model=ROUTER_MODEL,
+            max_tokens=16000,
+            temperature=0,
             messages=[
                 {"role": "system", "content": EXTRACT_PROMPT},
                 {"role": "user", "content": context},
             ],
-            max_tokens=16000,
-            temperature=0,
         )
-        raw = response.choices[0].message.content.strip()
+        raw = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):

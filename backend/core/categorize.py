@@ -95,19 +95,20 @@ def categorize_document(file_path: str) -> dict:
             "tags": [],
         }
 
-    # Call LLM
+    # Call LLM with retry
     try:
-        client = get_openrouter_client()
-        response = client.chat.completions.create(
+        from backend.core.config import call_openrouter
+        raw = call_openrouter(
+            prompt=f"Document text:\n{text[:3000]}",
             model=ROUTER_MODEL,
+            max_tokens=300,
+            temperature=0,
             messages=[
                 {"role": "system", "content": CATEGORIZE_PROMPT},
                 {"role": "user", "content": f"Document text:\n{text[:3000]}"},
             ],
-            max_tokens=300,
-            temperature=0,
         )
-        raw = response.choices[0].message.content.strip()
+        raw = raw.strip()
         if raw.startswith("```"):
             raw = raw.split("```")[1]
             if raw.startswith("json"):
