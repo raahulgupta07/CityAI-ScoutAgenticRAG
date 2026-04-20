@@ -808,16 +808,43 @@ async def get_downvoted(tenant_id: str, limit: int = Query(20)):
 
 @router.post("/sops/{sop_id}/standardize")
 async def standardize_doc(tenant_id: str, sop_id: str):
-    """Run document standardization on a processed document."""
-    import asyncio
+    """Run document standardization with SSE streaming progress."""
     from backend.core.sop_standardize import standardize_sop
     sop = db.get_sop(sop_id, tenant_id=tenant_id)
     if not sop:
         return {"error": "Document not found"}
-    loop = asyncio.get_event_loop()
-    result = await loop.run_in_executor(None, lambda: standardize_sop(sop_id, tenant_id=tenant_id))
-    db.log_audit(tenant_id, "standardize_document", resource_type="sop", resource_id=sop_id, details=sop.get("title", ""))
-    return result
+
+    status_queue: Queue = Queue()
+
+    def on_status(step: str, msg: str):
+        status_queue.put_nowait({"step": step, "message": msg})
+
+    def run_std():
+        return standardize_sop(sop_id, tenant_id=tenant_id, on_status=on_status)
+
+    async def event_generator():
+        loop = asyncio.get_event_loop()
+        task = asyncio.ensure_future(loop.run_in_executor(None, run_std))
+        try:
+            while not task.done():
+                try:
+                    await asyncio.sleep(0.3)
+                    while not status_queue.empty():
+                        s = status_queue.get_nowait()
+                        yield f"event: status\ndata: {json.dumps(s)}\n\n"
+                except (asyncio.CancelledError, GeneratorExit):
+                    return
+            while not status_queue.empty():
+                s = status_queue.get_nowait()
+                yield f"event: status\ndata: {json.dumps(s)}\n\n"
+            result = task.result()
+            db.log_audit(tenant_id, "standardize_document", resource_type="sop", resource_id=sop_id, details=sop.get("title", ""))
+            yield f"event: done\ndata: {json.dumps(result)}\n\n"
+        except Exception as e:
+            yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "Connection": "keep-alive", "X-Accel-Buffering": "no"})
 
 
 @router.get("/sops/{sop_id}/standardized")

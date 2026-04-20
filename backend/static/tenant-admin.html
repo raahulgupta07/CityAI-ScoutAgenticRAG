@@ -2563,22 +2563,44 @@ async function standardizeDoc(id) {
     logLine('DOC', '#006f7c', `<span style="color:#007518">━━━ DOCUMENT STANDARDIZATION ━━━</span>`);
     logLine('DOC', '#006f7c', `Document: <span style="color:#006f7c">${id}</span>`);
     logLine('DOC', '#006f7c', `Frameworks: <span style="color:#65655e">McKinsey Pyramid | Deloitte RACI | Accenture ADM | PwC Controls</span>`);
-    logLine('DOC', '#006f7c', `Analyzing content via AI...`);
     try {
         const res = await fetch(`${API}/sops/${id}/standardize`, {method:'POST', headers:headers()});
-        const data = await res.json();
-        if (data.error) {
-            logLine('ERROR', '#f95630', data.error);
+        if (res.ok && res.headers.get('content-type')?.includes('text/event-stream')) {
+            const reader = res.body.getReader();
+            const decoder = new TextDecoder();
+            let buf = '', ev = '';
+            while (true) {
+                const {value, done: streamDone} = await reader.read();
+                if (streamDone) break;
+                buf += decoder.decode(value, {stream: true});
+                const lines = buf.split('\n');
+                buf = lines.pop();
+                for (const line of lines) {
+                    if (line.startsWith('event:')) ev = line.slice(6).trim();
+                    else if (line.startsWith('data:') && ev) {
+                        try {
+                            const d = JSON.parse(line.slice(5));
+                            if (ev === 'status') {
+                                logLine('DOC', '#006f7c', `  ${d.message || d.step}`);
+                            } else if (ev === 'done') {
+                                const g = d.gaps || {};
+                                logLine('DOC', '#006f7c', `AI Analysis Complete:`);
+                                logLine('DOC', '#006f7c', `  Author: ${esc(d.original_author||'Unknown')}`);
+                                logLine('DOC', '#006f7c', `  Steps: ${d.steps||0} | Score: ${g.original_score||0} → ${d.score||0}/100`);
+                                logLine('SUCCESS', '#00fc40', `━━━ STANDARDIZATION COMPLETE ━━━`);
+                                logLine('SUCCESS', '#00fc40', `Score: ${d.score||0}/100 | DOCX ready for download`);
+                            } else if (ev === 'error') {
+                                logLine('ERROR', '#f95630', d.error || 'Standardization error');
+                            }
+                        } catch {}
+                        ev = '';
+                    }
+                }
+            }
         } else {
-            const g = data.gaps || {};
-            logLine('DOC', '#006f7c', `AI Analysis Complete:`);
-            logLine('DOC', '#006f7c', `  Author: <span style="color:#e0e0e0;font-weight:700">${data.original_author||'Unknown'}</span>`);
-            logLine('DOC', '#006f7c', `  Steps: <span style="color:#383832">${data.steps}</span> | Score: <span style="color:#383832">${g.original_score||0} → ${data.score}/100</span>`);
-            if(g.image_only_pages?.length) logLine('DOC', '#006f7c', `  Image-only pages enhanced: <span style="color:#383832">${g.image_only_pages.length}</span>`);
-            logLine('SUCCESS', '#00fc40', `<span style="color:#00fc40">━━━ DOCUMENT STANDARDIZATION COMPLETE ━━━</span>`);
-            logLine('SUCCESS', '#00fc40', `Score: <span style="color:#00fc40;font-weight:700">${data.score}/100</span> | Steps: <span style="color:#383832">${data.steps}</span>`);
-            logLine('SUCCESS', '#00fc40', `Author: ${data.original_author||'Unknown'} + AI Co-Author`);
-            logLine('SUCCESS', '#00fc40', `DOCX ready for download`);
+            const data = await res.json();
+            if (data.error) logLine('ERROR', '#f95630', data.error);
+            else logLine('SUCCESS', '#00fc40', `Standardized: score ${data.score}/100`);
         }
         await loadDocs();
     } catch(e) {
