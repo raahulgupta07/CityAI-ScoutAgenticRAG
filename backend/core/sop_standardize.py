@@ -173,7 +173,11 @@ def analyze_and_structure(sop_id: str, tenant_id: str = None, on_status: Callabl
     # ── Single-pass for small documents (fits in one LLM call) ────────────
     if total_content_chars <= _CHUNK_CONTENT_LIMIT:
         _status("sop_standardize", f"Single-pass analysis ({len(pages)} pages, {total_content_chars:,} chars)")
-        return _analyze_single_pass(sop, sop_id, tenant_id, pages, content_parts, image_only_pages, template_context)
+        _status("sop_standardize", f"Sending {total_content_chars:,} chars to AI for structuring...")
+        result = _analyze_single_pass(sop, sop_id, tenant_id, pages, content_parts, image_only_pages, template_context)
+        if "error" not in result:
+            _status("sop_standardize", f"AI returned {len(result.get('procedure', []))} procedure steps")
+        return result
 
     # ── Chunked processing for large documents ────────────────────────────
     num_chunks = (len(content_parts) + _PAGES_PER_CHUNK - 1) // _PAGES_PER_CHUNK

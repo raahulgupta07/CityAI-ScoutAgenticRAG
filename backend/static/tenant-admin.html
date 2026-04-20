@@ -2560,9 +2560,7 @@ async function standardizeDoc(id) {
     const ddBtn = document.getElementById('dd-std-btn');
     if (ddBtn) { ddBtn.innerHTML = '<span class="material-symbols-outlined" style="font-size:14px;animation:spin 1s linear infinite">progress_activity</span> STANDARDIZING...'; ddBtn.disabled = true; }
     const lp = document.getElementById('log-panel');
-    logLine('DOC', '#006f7c', `<span style="color:#007518">━━━ DOCUMENT STANDARDIZATION ━━━</span>`);
-    logLine('DOC', '#006f7c', `Document: <span style="color:#006f7c">${id}</span>`);
-    logLine('DOC', '#006f7c', `Frameworks: <span style="color:#65655e">McKinsey Pyramid | Deloitte RACI | Accenture ADM | PwC Controls</span>`);
+    logLine('DOC', '#006f7c', `Standardizing ${esc(id)}...`);
     try {
         const res = await fetch(`${API}/sops/${id}/standardize`, {method:'POST', headers:headers()});
         if (res.ok && res.headers.get('content-type')?.includes('text/event-stream')) {
