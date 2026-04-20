@@ -1630,12 +1630,24 @@ let processingId = null;
 async function processDoc(id) {
     if (processingId) { alert('Another document is already being trained. Please wait.'); return; }
     processingId = id;
-    // Immediately update the button on the clicked row before anything else
-    const row = document.querySelector(`tr[data-sopid="${id}"]`);
-    if (row) {
-        const actionsCell = row.querySelector('td:last-child');
-        if (actionsCell) actionsCell.innerHTML = `<div style="display:flex;align-items:center;gap:4px"><button onclick="event.stopPropagation();stopTraining('${id}')" style="padding:6px 12px;border-radius:0;background:#be2d06;border:2px solid #383832;color:white;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;text-transform:uppercase;box-shadow:2px 2px 0 #383832"><span class="material-symbols-outlined" style="font-size:14px;animation:spin 1s linear infinite">progress_activity</span>Stop</button></div>`;
-    }
+    // Immediately show progress bar on the row
+    renderDocTable();
+    // Also directly update in case renderDocTable didn't find it
+    setTimeout(() => {
+        const row = document.querySelector(`tr[data-sopid="${id}"]`);
+        if (row) {
+            const actionsCell = row.querySelector('td:last-child');
+            if (actionsCell && !actionsCell.querySelector('.train-progress')) {
+                actionsCell.innerHTML = `<div class="train-progress" style="width:140px">
+                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                        <span style="font-size:9px;font-weight:900;text-transform:uppercase;color:#007518">Training...</span>
+                        <button onclick="event.stopPropagation();stopTraining('${id}')" style="font-size:8px;background:none;border:none;color:#be2d06;cursor:pointer;font-weight:900;text-transform:uppercase;font-family:inherit">STOP</button>
+                    </div>
+                    <div style="background:#ebe8dd;height:6px;border:1px solid #383832;overflow:hidden"><div id="train-bar-${id}" style="height:100%;background:#00fc40;width:5%;transition:width 0.5s"></div></div>
+                </div>`;
+            }
+        }
+    }, 50);
     const lp = document.getElementById('log-panel');
     lp.innerHTML = '';
     logLine('INFO', '#00fc40', `<span style="color:#007518;font-weight:700">━━━ PIPELINE START ━━━</span>`);
@@ -1660,6 +1672,7 @@ async function processDoc(id) {
 
     // Try SSE streaming endpoint first, fall back to polling
     let streamed = false;
+    let _trainStepCount = 0;
     try {
         const resp = await fetch(`${API}/process/${id}/stream`, {method:'POST', headers:headers()});
         if (resp.ok && resp.headers.get('content-type')?.includes('text/event-stream')) {
@@ -1693,7 +1706,14 @@ async function processDoc(id) {
                             const color = levelColors[level]||'#dee3ea';
                             const tag = levelTags[level]||'INFO';
                             appendLog(tag, color, msg);
+                            // Update progress bar
+                            if (typeof _trainStepCount === 'undefined') _trainStepCount = 0;
+                            _trainStepCount++;
+                            const bar = document.getElementById('train-bar-' + id);
+                            if (bar) bar.style.width = Math.min(95, _trainStepCount * 4) + '%';
                         } else if (eventType === 'done') {
+                            const bar = document.getElementById('train-bar-' + id);
+                            if (bar) bar.style.width = '100%';
                             appendLog('SUCCESS', '#34d399', 'All pipeline steps completed. Document indexed and trained.');
                         } else if (eventType === 'error') {
                             appendLog('ERROR', '#ffb4ab', payload.error || 'Pipeline error');
