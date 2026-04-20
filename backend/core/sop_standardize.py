@@ -61,9 +61,9 @@ def _parse_llm_json(result_text: str) -> dict:
 
 # ── Chunked processing constants ──────────────────────────────────────────────
 # Pages per chunk — tuned so each chunk fits within LLM context with prompt overhead
-_PAGES_PER_CHUNK = 10
-# Max chars per chunk of content sent to LLM
-_CHUNK_CONTENT_LIMIT = 18000
+_PAGES_PER_CHUNK = 5
+# Max chars per chunk of content sent to LLM (smaller = less 429 errors)
+_CHUNK_CONTENT_LIMIT = 8000
 
 
 def _build_continuation_prompt(title: str, department: str, chunk_content: str,
@@ -191,7 +191,9 @@ def analyze_and_structure(sop_id: str, tenant_id: str = None, on_status: Callabl
     step_offset = len(merged.get("procedure", []))
 
     # ── Chunks 2..N: Extract procedures/definitions/escalation ────────────
+    import time as _time
     for ci, chunk in enumerate(chunks[1:], start=2):
+        _time.sleep(5)  # Rate limit cooldown between chunks
         chunk_content = chr(10).join(chunk)[:_CHUNK_CONTENT_LIMIT]
         # Extract page range from content headers like "[Page 11 (text)]"
         chunk_page_nums = []
@@ -243,6 +245,7 @@ def analyze_and_structure(sop_id: str, tenant_id: str = None, on_status: Callabl
         merged["references"] = list(dict.fromkeys(merged["references"]))
 
     # ── Final pass: Regenerate summary and diagrams over full content ──────
+    _time.sleep(5)  # Rate limit cooldown
     _status("sop_standardize", f"Final pass: Regenerating executive summary and diagrams over all {step_offset} steps")
     all_step_titles = [s.get("title", f"Step {s.get('step_number', '?')}") for s in merged.get("procedure", [])]
     try:
