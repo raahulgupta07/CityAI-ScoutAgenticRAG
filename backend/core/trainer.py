@@ -27,9 +27,17 @@ def get_training_status() -> dict:
     return _training_status.copy()
 
 
+_stop_requested = False
+
+def stop_training():
+    """Signal training to stop."""
+    global _stop_requested
+    _stop_requested = True
+
 def clear_training_logs():
-    global _training_logs
+    global _training_logs, _stop_requested
     _training_logs = []
+    _stop_requested = False
 
 
 def _log(level: str, message: str, detail: str = ""):
@@ -407,6 +415,11 @@ def train_on_document(sop_id: str, tenant_id: str = None, on_status=None) -> dic
             futures[future] = i
 
         for future in as_completed(futures):
+            if _stop_requested:
+                executor.shutdown(wait=False, cancel_futures=True)
+                _log("warn", "Training stopped by user")
+                _sub("Training stopped by user")
+                break
             result = future.result()
             results.append(result)
             completed += 1

@@ -1285,7 +1285,7 @@ function renderDocTable() {
         const isProcessing = typeof processingId !== 'undefined' && processingId === d.sop_id;
         // Only show Train button for untrained docs; trained docs get Standardize + Delete only
         const processBtn = isProcessing
-            ? `<button disabled style="padding:6px 12px;border-radius:0;background:#ebe8dd;border:2px solid #383832;color:#65655e;font-size:10px;font-weight:900;cursor:not-allowed;font-family:inherit;display:flex;align-items:center;gap:4px;text-transform:uppercase"><span class="material-symbols-outlined" style="font-size:14px;animation:spin 1s linear infinite">progress_activity</span>Training...</button>`
+            ? `<button onclick="event.stopPropagation();stopTraining('${d.sop_id}')" style="padding:6px 12px;border-radius:0;background:#be2d06;border:2px solid #383832;color:white;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;text-transform:uppercase;box-shadow:2px 2px 0 #383832"><span class="material-symbols-outlined" style="font-size:14px;animation:spin 1s linear infinite">progress_activity</span>Stop</button>`
             : isProcessed ? '' : `<button onclick="event.stopPropagation();processDoc('${d.sop_id}')" style="padding:6px 12px;border-radius:0;background:#00fc40;border:2px solid #383832;color:#383832;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;transition:all 0.15s;text-transform:uppercase;box-shadow:2px 2px 0 #383832" onmousedown="this.style.transform='translate(1px,1px)';this.style.boxShadow='1px 1px 0 #383832'" onmouseup="this.style.transform='';this.style.boxShadow='2px 2px 0 #383832'">Train</button>`;
         const sopScore = d.sop_score || 0;
         const hasStd = d.standardized_json != null;
@@ -1723,6 +1723,15 @@ async function processDoc(id) {
     processingId = null;
     await loadDocs(); await loadStats();
     renderDocTable(); // Restore buttons
+}
+
+function stopTraining(id) {
+    if(!confirm('Stop training? The document will keep whatever progress was made so far.')) return;
+    fetch(`${API}/process/${id}/stop`, {method:'POST', headers:headers()}).then(() => {
+        processingId = null;
+        renderDocTable();
+        logLine('TRAIN', '#ff9d00', `Training stopped for ${esc(id)}`);
+    }).catch(() => {});
 }
 
 async function deleteDoc(id) {

@@ -624,6 +624,18 @@ async def process_doc(tenant_id: str, sop_id: str):
             _processing_docs.discard(doc_key)
 
 
+@router.post("/process/{sop_id}/stop")
+async def stop_processing(tenant_id: str, sop_id: str):
+    """Stop a running pipeline for a document."""
+    doc_key = f"{tenant_id}:{sop_id}"
+    with _processing_lock:
+        _processing_docs.discard(doc_key)
+    # Signal the trainer to stop
+    from backend.core.trainer import stop_training
+    stop_training()
+    return {"status": "stopped", "sop_id": sop_id}
+
+
 @router.post("/process/{sop_id}/stream")
 async def process_doc_stream(tenant_id: str, sop_id: str):
     """Run full pipeline + auto-train with real-time SSE status streaming."""
