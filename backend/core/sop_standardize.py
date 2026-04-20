@@ -60,10 +60,12 @@ def _parse_llm_json(result_text: str) -> dict:
 
 
 # ── Chunked processing constants ──────────────────────────────────────────────
-# Pages per chunk — tuned so each chunk fits within LLM context with prompt overhead
-_PAGES_PER_CHUNK = 5
-# Max chars per chunk of content sent to LLM (smaller = less 429 errors)
-_CHUNK_CONTENT_LIMIT = 8000
+# Pages per chunk — 3 pages keeps each LLM call small (no 429 errors even for 100+ page docs)
+_PAGES_PER_CHUNK = 3
+# Max chars per chunk of content sent to LLM
+_CHUNK_CONTENT_LIMIT = 6000
+# Delay between LLM calls to avoid rate limits (seconds)
+_CHUNK_DELAY = 3
 
 
 def _build_continuation_prompt(title: str, department: str, chunk_content: str,
@@ -193,7 +195,7 @@ def analyze_and_structure(sop_id: str, tenant_id: str = None, on_status: Callabl
     # ── Chunks 2..N: Extract procedures/definitions/escalation ────────────
     import time as _time
     for ci, chunk in enumerate(chunks[1:], start=2):
-        _time.sleep(5)  # Rate limit cooldown between chunks
+        _time.sleep(_CHUNK_DELAY)  # Rate limit cooldown between chunks
         chunk_content = chr(10).join(chunk)[:_CHUNK_CONTENT_LIMIT]
         # Extract page range from content headers like "[Page 11 (text)]"
         chunk_page_nums = []
@@ -207,7 +209,7 @@ def analyze_and_structure(sop_id: str, tenant_id: str = None, on_status: Callabl
 
         prompt = _build_continuation_prompt(title, department, chunk_content, page_range, step_offset)
         try:
-            result_text = _call_llm(prompt, max_tokens=8000)
+            result_text = _call_llm(prompt, max_tokens=4000)
             chunk_data = _parse_llm_json(result_text)
         except json.JSONDecodeError as e:
             logger.warning(f"Chunk {ci} JSON parse error: {e} — skipping")
@@ -245,7 +247,7 @@ def analyze_and_structure(sop_id: str, tenant_id: str = None, on_status: Callabl
         merged["references"] = list(dict.fromkeys(merged["references"]))
 
     # ── Final pass: Regenerate summary and diagrams over full content ──────
-    _time.sleep(5)  # Rate limit cooldown
+    _time.sleep(_CHUNK_DELAY)  # Rate limit cooldown
     _status("sop_standardize", f"Final pass: Regenerating executive summary and diagrams over all {step_offset} steps")
     all_step_titles = [s.get("title", f"Step {s.get('step_number', '?')}") for s in merged.get("procedure", [])]
     try:
