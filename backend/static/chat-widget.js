@@ -748,6 +748,9 @@ function openPdf(sopId, page) {
     document.getElementById('cw-pdf-title-text').textContent = docName;
     panel.classList.add('cw-open');
     document.getElementById('cw-root').style.width = '50%';
+    // Hide left context panel in admin view to give more room
+    const leftPanel = document.getElementById('chat-left-panel');
+    if (leftPanel) leftPanel.style.display = 'none';
 
     // DOCX download button (admin mode with allDocs)
     const dlBtn = document.getElementById('cw-pdf-dl');
@@ -805,6 +808,9 @@ function _renderPdfPages(content, imgBase, cacheBust, pageCount, page) {
 function closePdf() {
     document.getElementById('cw-pdf-panel').classList.remove('cw-open');
     document.getElementById('cw-root').style.width = '100%';
+    // Show left context panel again in admin view
+    const leftPanel = document.getElementById('chat-left-panel');
+    if (leftPanel) leftPanel.style.display = '';
     // Scroll chat to bottom after panel closes
     setTimeout(() => { if (STATE.messagesEl) STATE.messagesEl.scrollTop = STATE.messagesEl.scrollHeight; }, 300);
 }
@@ -863,6 +869,14 @@ window.ChatWidget = {
         }
 
         // Scroll-to-bottom button visibility
+        // Click on chat area closes PDF panel
+        STATE.messagesEl.addEventListener('click', (e) => {
+            const panel = document.getElementById('cw-pdf-panel');
+            if (panel && panel.classList.contains('cw-open') && !panel.contains(e.target)) {
+                closePdf();
+            }
+        });
+
         STATE.messagesEl.addEventListener('scroll', () => {
             const el = STATE.messagesEl;
             const btn = document.getElementById('cw-scroll-btn');
