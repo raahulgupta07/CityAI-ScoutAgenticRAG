@@ -1604,6 +1604,21 @@ async function handleFiles(files) {
     lp.scrollTop = lp.scrollHeight;
     setTimeout(() => { r.innerHTML = ''; }, 8000);
     await loadDocs(); await loadStats();
+
+    // Auto-train newly uploaded documents
+    const uploaded = allDocs.filter(d => !d.indexed_at && (!d.department || d.department === 'Uploaded'));
+    if (uploaded.length > 0) {
+        logLine('TRAIN', '#007518', `Auto-training ${uploaded.length} newly uploaded document(s)...`);
+        for (const d of uploaded) {
+            logLine('TRAIN', '#007518', `Training ${esc(d.sop_id)}...`);
+            try {
+                await fetch(`${API}/process/${d.sop_id}/stream`, {method:'POST', headers:headers()});
+            } catch(e) {
+                logLine('ERROR', '#f95630', `${esc(d.sop_id)}: ${e.message}`);
+            }
+        }
+        await loadDocs(); await loadStats();
+    }
 }
 
 let processingId = null;
@@ -1710,7 +1725,16 @@ async function processDoc(id) {
     renderDocTable(); // Restore buttons
 }
 
-async function deleteDoc(id) { if(!confirm(`Delete ${id}?`))return; await fetch(`${API}/sops/${id}`,{method:'DELETE',headers:headers()}); await loadDocs(); await loadStats(); }
+async function deleteDoc(id) {
+    const doc = allDocs.find(d => d.sop_id === id);
+    const isTrained = doc && ((doc.department && doc.department !== 'Uploaded') || doc.indexed_at);
+    const msg = isTrained
+        ? `Delete "${id}"?\n\n⚠️ WARNING: All training data, embeddings, intent routes, and Q&A pairs will be permanently deleted. You will need to re-upload and re-train this document.`
+        : `Delete "${id}"?`;
+    if(!confirm(msg)) return;
+    await fetch(`${API}/sops/${id}`,{method:'DELETE',headers:headers()});
+    await loadDocs(); await loadStats();
+}
 
 let currentDetailId = '';
 
