@@ -172,7 +172,7 @@ const CSS = `
 .cw-session-badge span { background: #ebe8dd; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 900; padding: 4px 12px; color: #65655e; }
 
 /* PDF Panel */
-.cw-pdf-overlay { display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 50%; background: #feffd6; border-left: 3px solid #383832; z-index: 1; flex-direction: column; animation: cwSlideIn 0.25s ease-out; }
+.cw-pdf-overlay { display: none; position: absolute; top: 0; right: 0; bottom: 0; width: 50%; background: #feffd6; border-left: 3px solid #383832; z-index: 10; flex-direction: column; animation: cwSlideIn 0.25s ease-out; }
 .cw-pdf-overlay.cw-open { display: flex; }
 @keyframes cwSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
 .cw-pdf-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: #383832; border-bottom: 2px solid #383832; }
