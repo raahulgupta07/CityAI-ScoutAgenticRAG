@@ -100,9 +100,9 @@ def call_openrouter(prompt: str, model: str = None, max_tokens: int = 8000,
                       "max_tokens": max_tokens, "temperature": temperature},
                 timeout=120,
             )
-            # Rate limited — wait and retry
+            # Rate limited — wait and retry (longer waits for OpenRouter)
             if resp.status_code == 429:
-                wait = min(2 ** attempt * 2, 30)
+                wait = min(2 ** attempt * 5, 60)
                 logger.warning(f"OpenRouter 429 rate limit, retrying in {wait}s (attempt {attempt + 1}/{max_retries})")
                 time.sleep(wait)
                 continue

@@ -513,6 +513,7 @@ def process_and_train(pdf_path: str, sop_id: str, on_status=None, tenant_id: str
     std_result = None
     if tenant_id:
         try:
+            time.sleep(5)  # Cool down before heavy standardization LLM call
             _log("step", "━━━ SOP STANDARDIZATION ━━━", "Generating Tier-1 consulting DOCX")
             _notify("sop_standardization", "SOP Standardization: generating structured DOCX")
             t3 = time.time()

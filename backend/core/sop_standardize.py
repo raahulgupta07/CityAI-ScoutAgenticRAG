@@ -28,7 +28,7 @@ def _get_template_context(department: str) -> str:
 
 
 def _call_llm(prompt: str, max_tokens: int = 8000) -> str:
-    return call_openrouter(prompt, model=ROUTER_MODEL, max_tokens=max_tokens)
+    return call_openrouter(prompt, model=ROUTER_MODEL, max_tokens=max_tokens, max_retries=5)
 
 
 # ── AI: Tier-1 Consulting Structure ──────────────────────────────────────────
