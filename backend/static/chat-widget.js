@@ -172,7 +172,7 @@ const CSS = `
 .cw-session-badge span { background: #ebe8dd; font-size: 10px; text-transform: uppercase; letter-spacing: 0.1em; font-weight: 900; padding: 4px 12px; color: #65655e; }
 
 /* PDF Panel */
-.cw-pdf-overlay { display: none; position: fixed; top: 0; right: 0; bottom: 0; width: 50%; background: #feffd6; border-left: 3px solid #383832; z-index: 10; flex-direction: column; animation: cwSlideIn 0.25s ease-out; }
+.cw-pdf-overlay { display: none; width: 50%; background: #feffd6; border-left: 3px solid #383832; flex-direction: column; overflow: hidden; }
 .cw-pdf-overlay.cw-open { display: flex; }
 @keyframes cwSlideIn { from { transform: translateX(100%); } to { transform: translateX(0); } }
 .cw-pdf-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: #383832; border-bottom: 2px solid #383832; }
@@ -212,7 +212,7 @@ const CSS = `
     .cw-ref-thumb { width: 110px; }
     .cw-ref-thumb img { height: 120px; }
     .cw-source-badge { font-size: 10px; padding: 4px 8px; }
-    .cw-pdf-overlay { width: 100% !important; }
+    .cw-pdf-overlay { width: 100% !important; position: absolute !important; top: 0; right: 0; bottom: 0; z-index: 10; }
     .cw-root { width: 100% !important; }
     .cw-footer { font-size: 9px; }
 }
@@ -749,9 +749,6 @@ function openPdf(sopId, page) {
     document.getElementById('cw-pdf-title-text').textContent = docName;
     panel.classList.add('cw-open');
     document.getElementById('cw-root').style.width = '50%';
-    // Hide left context panel in admin view to give more room
-    const leftPanel = document.getElementById('chat-left-panel');
-    if (leftPanel) leftPanel.style.display = 'none';
 
     // DOCX download button (admin mode with allDocs)
     const dlBtn = document.getElementById('cw-pdf-dl');
@@ -830,9 +827,6 @@ function exportChatPdf() {
 function closePdf() {
     document.getElementById('cw-pdf-panel').classList.remove('cw-open');
     document.getElementById('cw-root').style.width = '100%';
-    // Show left context panel again in admin view
-    const leftPanel = document.getElementById('chat-left-panel');
-    if (leftPanel) leftPanel.style.display = '';
     // Scroll chat to bottom after panel closes
     setTimeout(() => { if (STATE.messagesEl) STATE.messagesEl.scrollTop = STATE.messagesEl.scrollHeight; }, 300);
 }
@@ -853,6 +847,8 @@ window.ChatWidget = {
         STATE.escalation = opts.escalation || null;
 
         const container = opts.container;
+        container.style.display = 'flex';
+        container.style.flexDirection = 'row';
         container.innerHTML = buildHTML();
 
         STATE.container = container;

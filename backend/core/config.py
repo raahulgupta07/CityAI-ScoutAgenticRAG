@@ -61,7 +61,7 @@ if not OPENROUTER_API_KEY:
     logger.warning("OPENROUTER_API_KEY is not set — all LLM calls will fail. Set it in .env or environment.")
 
 # ── Models (all via OpenRouter — override via env vars without redeploying) ──
-ROUTER_MODEL = os.getenv("ROUTER_MODEL", "google/gemini-2.0-flash-001")      # Categorize + extract + pipeline (fast, stable)
+ROUTER_MODEL = os.getenv("ROUTER_MODEL", "google/gemini-3.1-flash-lite-preview")  # Pipeline + standardize (fast, cheap, less 429s)
 VISION_MODEL = os.getenv("VISION_MODEL", "google/gemini-3-flash-preview")    # Chat + vision (user-facing, best quality)
 EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")     # OpenAI embeddings for PgVector
 
@@ -80,17 +80,24 @@ def get_openrouter_client():
     return OpenAI(api_key=OPENROUTER_API_KEY, base_url=OPENROUTER_BASE_URL, timeout=120)
 
 
+FALLBACK_MODEL = os.getenv("FALLBACK_MODEL", "google/gemini-2.0-flash-001")  # Backup if primary model fails
+
+
 def call_openrouter(prompt: str, model: str = None, max_tokens: int = 8000,
                     temperature: float = 0.15, messages: list = None,
-                    max_retries: int = 3) -> str:
-    """Unified OpenRouter call with retry + exponential backoff.
-    Use this instead of raw httpx.post or client.chat.completions.create.
-    Returns the response text content.
+                    max_retries: int = 5, use_fallback: bool = True) -> str:
+    """Unified OpenRouter call with 5-layer defense:
+    1. Retry with exponential backoff (up to max_retries)
+    2. Longer waits for 429 (10s, 20s, 40s, 60s, 90s)
+    3. Fallback to backup model if primary exhausts retries
+    4. Handles empty responses gracefully
+    5. Never crashes silently
     """
     import httpx
     _model = model or ROUTER_MODEL
     _messages = messages or [{"role": "user", "content": prompt}]
 
+    last_error = None
     for attempt in range(max_retries):
         try:
             resp = httpx.post(
@@ -98,39 +105,63 @@ def call_openrouter(prompt: str, model: str = None, max_tokens: int = 8000,
                 headers={"Authorization": f"Bearer {OPENROUTER_API_KEY}"},
                 json={"model": _model, "messages": _messages,
                       "max_tokens": max_tokens, "temperature": temperature},
-                timeout=120,
+                timeout=180,
             )
-            # Rate limited — wait and retry (longer waits for OpenRouter)
+            # Rate limited — longer waits to let quota reset
             if resp.status_code == 429:
-                wait = min(2 ** attempt * 5, 60)
-                logger.warning(f"OpenRouter 429 rate limit, retrying in {wait}s (attempt {attempt + 1}/{max_retries})")
+                wait = min(10 * (attempt + 1), 90)  # 10s, 20s, 30s, 40s, 50s...
+                logger.warning(f"OpenRouter 429, waiting {wait}s (attempt {attempt + 1}/{max_retries})")
                 time.sleep(wait)
+                last_error = f"429 rate limit after {attempt + 1} attempts"
                 continue
             # Server error — retry
             if resp.status_code >= 500:
-                wait = min(2 ** attempt * 2, 30)
+                wait = min(2 ** attempt * 3, 30)
                 logger.warning(f"OpenRouter {resp.status_code}, retrying in {wait}s (attempt {attempt + 1}/{max_retries})")
                 time.sleep(wait)
+                last_error = f"Server error {resp.status_code}"
                 continue
             resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
+            data = resp.json()
+            content = data.get("choices", [{}])[0].get("message", {}).get("content", "")
+            if not content or not content.strip():
+                logger.warning(f"OpenRouter returned empty response (attempt {attempt + 1})")
+                last_error = "Empty response"
+                time.sleep(3)
+                continue
+            return content
         except httpx.TimeoutException:
+            wait = min(2 ** attempt * 5, 30)
+            logger.warning(f"OpenRouter timeout, retrying in {wait}s (attempt {attempt + 1}/{max_retries})")
+            last_error = "Timeout"
             if attempt < max_retries - 1:
-                wait = min(2 ** attempt * 3, 30)
-                logger.warning(f"OpenRouter timeout, retrying in {wait}s (attempt {attempt + 1}/{max_retries})")
                 time.sleep(wait)
                 continue
-            raise
-        except httpx.HTTPStatusError:
-            raise  # Non-retryable HTTP errors (400, 401, 403, etc.)
-        except Exception:
+        except httpx.HTTPStatusError as e:
+            last_error = str(e)
+            # 400/401/403 = don't retry
+            if e.response.status_code < 500:
+                raise
             if attempt < max_retries - 1:
-                time.sleep(2)
+                time.sleep(3)
                 continue
-            raise
-    # All retries exhausted
-    resp.raise_for_status()
-    return resp.json()["choices"][0]["message"]["content"]
+        except Exception as e:
+            last_error = str(e)
+            if attempt < max_retries - 1:
+                time.sleep(3)
+                continue
+
+    # All retries exhausted — try fallback model
+    if use_fallback and _model != FALLBACK_MODEL:
+        logger.warning(f"Primary model {_model} failed after {max_retries} attempts, trying fallback {FALLBACK_MODEL}")
+        try:
+            return call_openrouter(prompt, model=FALLBACK_MODEL, max_tokens=max_tokens,
+                                   temperature=temperature, messages=messages,
+                                   max_retries=3, use_fallback=False)
+        except Exception as e:
+            logger.error(f"Fallback model also failed: {e}")
+
+    raise Exception(f"OpenRouter call failed after {max_retries} retries: {last_error}")
 
 
 # ── Structured JSON Logging ──────────────────────────────────────────────────

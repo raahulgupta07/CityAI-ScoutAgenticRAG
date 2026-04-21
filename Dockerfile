@@ -6,7 +6,7 @@
 # ============================================================================
 
 # --- Stage 1: Build Frontend ---
-FROM node:22-slim AS frontend-builder
+FROM --platform=linux/amd64 node:22-slim AS frontend-builder
 
 WORKDIR /frontend
 
@@ -18,15 +18,18 @@ RUN npm run build
 # Output: /frontend/build/ (static HTML/JS/CSS)
 
 # --- Stage 2: Python API + Frontend ---
-FROM python:3.11-slim
+FROM --platform=linux/amd64 python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
     PYTHONPATH=/app
 
-# System dependencies
+# System dependencies (gcc for builds, poppler+fonts for PDF rendering)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc libffi-dev curl \
+    poppler-utils \
+    fonts-liberation fonts-dejavu-core fontconfig \
+    && fc-cache -fv \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 

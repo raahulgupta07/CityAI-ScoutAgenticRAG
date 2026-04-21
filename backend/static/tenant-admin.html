@@ -31,7 +31,6 @@
 .log-panel{background:#1a1a1a;padding:8px 12px;font-family:'SF Mono',Consolas,monospace;font-size:11px;color:#e0e0e0;max-height:150px;overflow-y:auto;line-height:1.5}
 .log-step{color:#ff9d00;font-weight:700}.log-info{color:#00fc40}.log-done{color:#00fc40;font-weight:700}.log-error{color:#f95630;font-weight:700}
 .tab-content{display:none}.tab-content.active{display:block}
-@media(max-width:1200px){#chat-left-panel{display:none!important}}
 input,textarea,select{padding:10px 14px;border:2px solid #383832;background:white;color:#383832;font-size:13px;font-family:'Space Grotesk',sans-serif;width:100%;font-weight:700}
 input:focus,textarea:focus{outline:none;border-color:#007518;box-shadow:0 0 0 2px rgba(0,117,24,0.15)}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -397,7 +396,7 @@ input:focus,textarea:focus{outline:none;border-color:#007518;box-shadow:0 0 0 2p
 <!-- Documents Tab -->
 <div id="tab-documents" class="tab-content">
     <!-- Hero / Stats Bento Grid -->
-    <div style="display:grid;grid-template-columns:8fr 4fr;gap:24px;margin-bottom:32px">
+    <div id="doc-hero-grid" style="display:grid!important;grid-template-columns:8fr 4fr!important;gap:24px;margin-bottom:32px;min-height:180px">
         <!-- Knowledge Base Hero -->
         <div style="background:#ffffff;padding:32px;border-top:2px solid #383832;border-left:2px solid #383832;border-bottom:4px solid #383832;border-right:4px solid #383832;box-shadow:4px 4px 0px 0px #383832;display:flex;flex-direction:column;justify-content:space-between;position:relative;overflow:hidden">
             <div>
@@ -577,46 +576,7 @@ input:focus,textarea:focus{outline:none;border-color:#007518;box-shadow:0 0 0 2p
 
 <!-- Chat Tab -->
 <div id="tab-chat" class="tab-content">
-    <div style="display:flex;gap:24px;height:calc(100vh - 160px)">
-        <!-- Left Panel: Context + Parameters (hidden when screen < 1200px) -->
-        <section id="chat-left-panel" style="width:280px;flex-shrink:0;display:flex;flex-direction:column;gap:16px;overflow-y:auto">
-            <!-- Current Context -->
-            <div style="background:#ffffff;padding:24px;border-top:2px solid #383832;border-left:2px solid #383832;border-bottom:4px solid #383832;border-right:4px solid #383832;box-shadow:4px 4px 0px 0px #383832">
-                <h3 style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;font-weight:900;color:#65655e;margin-bottom:16px">Current Context</h3>
-                <div id="chat-context-docs" style="display:flex;flex-direction:column;gap:12px">
-                    <div style="background:#f6f4e9;padding:16px;border:2px solid #383832">
-                        <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:8px">
-                            <span style="font-size:12px;font-weight:700;color:#383832">No documents yet</span>
-                        </div>
-                        <p style="font-size:10px;color:#65655e">Upload documents to start chatting</p>
-                    </div>
-                </div>
-            </div>
-            <!-- Agent Status -->
-            <div style="background:#ffffff;padding:24px;border-top:2px solid #383832;border-left:2px solid #383832;border-bottom:4px solid #383832;border-right:4px solid #383832;box-shadow:4px 4px 0px 0px #383832">
-                <h3 style="font-size:10px;text-transform:uppercase;letter-spacing:0.1em;font-weight:900;color:#65655e;margin-bottom:16px">Agent Status</h3>
-                <div style="display:flex;flex-direction:column;gap:12px">
-                    <div style="display:flex;justify-content:space-between;align-items:center">
-                        <span style="font-size:11px;font-weight:700;color:#383832">Vector Search</span>
-                        <span style="font-size:9px;font-weight:900;padding:2px 8px;background:#007518;color:white;text-transform:uppercase">Active</span>
-                    </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center">
-                        <span style="font-size:11px;font-weight:700;color:#383832">Wiki Knowledge</span>
-                        <span style="font-size:9px;font-weight:900;padding:2px 8px;background:#007518;color:white;text-transform:uppercase">Active</span>
-                    </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center">
-                        <span style="font-size:11px;font-weight:700;color:#383832">Intent Routes</span>
-                        <span style="font-size:9px;font-weight:900;padding:2px 8px;background:#007518;color:white;text-transform:uppercase">Active</span>
-                    </div>
-                    <div style="display:flex;justify-content:space-between;align-items:center">
-                        <span style="font-size:11px;font-weight:700;color:#383832">Feedback Learning</span>
-                        <span style="font-size:9px;font-weight:900;padding:2px 8px;background:#007518;color:white;text-transform:uppercase">Active</span>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        <!-- Right Panel: Chat (shared widget) -->
+    <div style="display:flex;height:calc(100vh - 160px)">
         <section id="admin-chat-container" style="flex:1;border-top:2px solid #383832;border-left:2px solid #383832;border-bottom:4px solid #383832;border-right:4px solid #383832;box-shadow:4px 4px 0px 0px #383832;overflow:hidden">
         </section>
     </div>
@@ -1139,40 +1099,8 @@ function switchTab(name, btn) {
     const titleEl = document.getElementById('tab-title');
     if (titleEl) titleEl.textContent = tabTitles[name] || name;
     if (name === 'logs') loadLogs();
-    if (name === 'chat') { initAdminChat(); loadChatContext(); }
+    if (name === 'chat') { initAdminChat(); }
     if (name === 'config') loadSchedule();
-}
-
-async function loadChatContext() {
-    const ctx = document.getElementById('chat-context-docs');
-    if (!ctx) return;
-    try {
-        const docs = await (await fetch(`${API}/sops`, {headers:headers()})).json();
-        if (!docs.length) {
-            ctx.innerHTML = '<div style="background:#f6f4e9;padding:16px;border:2px solid #383832"><span style="font-size:12px;font-weight:900;color:#383832">No documents yet</span><p style="font-size:10px;color:#65655e;margin-top:4px">Upload documents to start chatting</p></div>';
-            return;
-        }
-        ctx.innerHTML = docs.slice(0, 5).map(d => {
-            const isIndexed = d.department && d.department !== 'Uploaded';
-            const score = d.sop_score || 0;
-            return `<div style="background:#f6f4e9;padding:12px;border:2px solid #383832">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                    <span style="font-size:11px;font-weight:900;color:#383832">${esc(d.title || d.sop_id)}</span>
-                    ${score > 0 ? `<span style="font-size:9px;font-weight:900;padding:2px 6px;background:#383832;color:#feffd6">${score}</span>` : ''}
-                </div>
-                <div style="display:flex;gap:8px;align-items:center">
-                    <span style="font-size:9px;color:#65655e;font-weight:700">${esc(d.department || '—')}</span>
-                    <span style="font-size:9px;color:#65655e">·</span>
-                    <span style="font-size:9px;color:#65655e;font-weight:700">${d.page_count || 0}p</span>
-                    <span style="font-size:9px;color:#65655e">·</span>
-                    <span style="font-size:9px;font-weight:900;color:${isIndexed ? '#007518' : '#65655e'}">${isIndexed ? 'INDEXED' : 'PENDING'}</span>
-                </div>
-            </div>`;
-        }).join('');
-        if (docs.length > 5) {
-            ctx.innerHTML += `<p style="font-size:9px;color:#65655e;text-align:center;margin-top:4px">+${docs.length - 5} more documents</p>`;
-        }
-    } catch(e) {}
 }
 
 if (TOKEN) showAdmin();
@@ -1309,7 +1237,6 @@ async function showAdmin() {
     } catch {}
     await loadStats();
     await loadDocs();
-    loadChatContext();
     // Always show pipeline bar + resume if training is running
     document.getElementById('pipeline-bar').style.display = 'block';
     checkRunningTraining();

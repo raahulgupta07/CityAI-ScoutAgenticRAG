@@ -258,10 +258,10 @@ def make_tools(tenant_id: str = None) -> list:
                 try:
                     start, end = part.split("-", 1)
                     page_nums.extend(range(int(start), int(end) + 1))
-                except Exception: pass
+                except (ValueError, TypeError): pass
             else:
                 try: page_nums.append(int(part))
-                except Exception: pass
+                except (ValueError, TypeError): pass
         if not page_nums: page_nums = [1, 2, 3]
         page_contents = db.get_page_contents(sop_id, page_nums, tenant_id=tenant_id)
         if page_contents:

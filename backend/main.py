@@ -235,7 +235,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # Tenant admin routes: require tenant or super token
         if path.startswith("/api/t/") and "/admin/" in path:
             # Exempt read-only paths loaded by img tags or public chat widget (no auth headers)
-            if "/pages/" in path or path.endswith("/preview") or path.endswith("/starter-questions"):
+            if "/pages/" in path or "/download/" in path or path.endswith("/preview") or path.endswith("/starter-questions"):
                 return await call_next(request)
             if ADMIN_USER and ADMIN_PASS:
                 token_info = _validate_token(token)
@@ -253,7 +253,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
 app.add_middleware(AuthMiddleware)
 
 # ── CORS ─────────────────────────────────────────────────────────────────────
-_cors_origins = os.environ.get("ALLOWED_ORIGINS", "*").split(",")
+_cors_origins = [o.strip() for o in os.environ.get("ALLOWED_ORIGINS", "*").split(",")]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=_cors_origins,

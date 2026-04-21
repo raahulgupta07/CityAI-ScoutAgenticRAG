@@ -6,12 +6,13 @@ Multi-tenant document intelligence platform with AI-powered chat. Each tenant ge
 ## Tech Stack
 - **Backend:** FastAPI + Agno agent framework (Python 3.11)
 - **Super Admin:** SvelteKit + Tailwind CSS
-- **Tenant Admin:** Standalone HTML (Brutalist design, 7-tab panel)
-- **Chat Widget:** Shared `chat-widget.js` — single source for admin + public chat
+- **Tenant Admin:** Standalone HTML (Brutalist design, 6-tab panel)
+- **Chat Widget:** Shared `chat-widget.js` — single source for admin + public chat (side-by-side PDF viewer)
 - **Agent:** Agno with 12 tools + self-learning + feedback learning + visual PDF reading
 - **Database:** PostgreSQL 18 + PgVector (schema-per-tenant) + connection pool (psycopg_pool)
-- **LLM (pipeline):** Gemini 2.0 Flash via OpenRouter — env-configurable
+- **LLM (pipeline):** Gemini 3.1 Flash Lite via OpenRouter — env-configurable
 - **LLM (chat):** Gemini 3 Flash via OpenRouter — env-configurable
+- **LLM (fallback):** Gemini 2.0 Flash — auto-switches if primary model fails
 - **Embeddings:** text-embedding-3-small via OpenRouter
 - **Retrieval:** Hybrid BM25 + Vector with RRF fusion + chunk-level embeddings (400 tokens)
 - **Deploy:** Docker Compose (2 containers: scoutrag-db + scoutrag-api)
@@ -38,16 +39,17 @@ DB_DATABASE=scoutragdb
 ADMIN_USER=admin                    # Super admin login (empty = no login required)
 ADMIN_PASS=admin123
 PORT=80                             # Server port
-ROUTER_MODEL=google/gemini-2.0-flash-001     # Pipeline model
-VISION_MODEL=google/gemini-3-flash-preview    # Chat + vision model
-EMBEDDING_MODEL=text-embedding-3-small        # Embedding model
-LOG_LEVEL=INFO                                # Logging level
+ROUTER_MODEL=google/gemini-3.1-flash-lite-preview  # Pipeline + standardize model
+VISION_MODEL=google/gemini-3-flash-preview          # Chat + vision model
+FALLBACK_MODEL=google/gemini-2.0-flash-001          # Auto-fallback if primary fails
+EMBEDDING_MODEL=text-embedding-3-small               # Embedding model
+LOG_LEVEL=INFO                                       # Logging level
 ```
 
 ## Architecture
 ```
 SUPER ADMIN (SvelteKit)          TENANT ADMIN (HTML)           PUBLIC CHAT
-/  /monitoring  /system          /t/{id}/admin (7 tabs)        /c/{token}
+/  /monitoring  /system          /t/{id}/admin (6 tabs)        /c/{token}
         │                                │                         │
         └────────────────────────────────┼─────────────────────────┘
                                          ▼
@@ -92,7 +94,7 @@ Step 11: Wiki Synthesis          (~5s)   → cross-document knowledge
 Total: ~2-3 minutes per document
 ```
 
-Visual step tracker on document row: `[CAT] [VIS] [SCR] [ENH] [SAVE] [Q&A] [EMB] [CHK] [TRAIN] [WIKI]`
+Visual step tracker: `[CAT] [VIS] [SCR] [ENH] [SAVE] [Q&A] [EMB] [CHK] [TRAIN] [WIKI]`
 Each badge turns green as it completes. Progress bar + percentage + ETA countdown.
 Browser notification + beep when training completes.
 
@@ -105,7 +107,20 @@ Reads all page_content → sends to AI in 3-page chunks:
   Final: Executive summary + Mermaid diagrams
 → Generates DOCX (McKinsey/Deloitte/Accenture/PwC frameworks)
 → Score: original vs standardized (gap analysis)
-→ 100+ page documents supported (34 small LLM calls, 3s gaps)
+→ Auto-embeds standardized content (pages 900+) for chat search
+→ 100+ page documents supported (chunked LLM calls, 5s gaps)
+```
+
+Both raw (pages 1-N) and standardized (pages 900+) content are searchable in chat.
+Recommended workflow: Standardize first → then Train for best search quality.
+
+## 5-Layer Error Defense
+```
+Layer 1: Smart Retries     — 7 retries, 10-90s backoff for 429s
+Layer 2: Fallback Model    — auto-switch to gemini-2.0-flash if primary fails
+Layer 3: JSON Repair       — fix truncated LLM output instead of crashing
+Layer 4: Graceful Skip     — failed chunk/step skipped, pipeline continues
+Layer 5: Honest Status     — errors show ERROR not fake "COMPLETE"
 ```
 
 ## Agent Tools (12)
@@ -121,13 +136,24 @@ Reads all page_content → sends to AI in 3-page chunks:
 | get_screenshots | Get [IMG:page:index] tags |
 | get_source_overview | Library overview |
 | save_discovery | Learn new patterns |
-| read_page_visual | **NEW** — render PDF page as image, send to Gemini vision |
+| read_page_visual | Render PDF page as image, send to Gemini vision |
 
-## Starter Question Cards
-ChatGPT-style 2×2 grid on welcome screen. Sources:
-- `sops.qa_pairs` — Q&A pairs from knowledge extraction
-- `intent_routes` — queries from auto-training discovery
-Shuffled randomly per load. Click sends question immediately.
+## Follow-up Suggestions (Hybrid)
+Instant DB Q&A pairs + LLM-generated (3s timeout). Always fast, never blocks.
+
+## Chat Widget
+Shared `chat-widget.js` powers both admin and public chat:
+- SSE streaming with tool step visualization
+- Starter question cards (2x2 grid from trained Q&A)
+- Inline citations `[REF:doc:page]` → clickable, opens side-by-side PDF viewer
+- Screenshots `[IMG:page:index]` → rendered inline
+- PDF viewer opens on right, chat shrinks to left (no overlap)
+- Feedback with reason popup
+- Follow-up suggestions (hybrid: DB instant + LLM smart)
+- Export as PDF
+- Multi-turn conversation history
+- localStorage persistence (1hr TTL)
+- Mobile responsive
 
 ## Document Library Features
 - **Pin/Star** — pinned docs sort to top (persisted in DB)
@@ -137,15 +163,6 @@ Shuffled randomly per load. Click sends question immediately.
 - **Standardize All** — bulk standardization
 - **Full-text Search** — search across all page content with highlights
 - **Document Versioning** — upload v2 keeps v1 history
-
-## Analytics Dashboard (Logs tab)
-- Stats cards: Total Queries, Avg Response Time, Satisfaction Rate, Low Quality
-- Daily query volume chart (pure CSS, last 7 days)
-- Top 10 popular queries
-- Failed/low quality queries list
-
-## Scheduled Re-Training (Config tab)
-Toggle + interval (Daily/Weekly/Monthly). Background thread checks hourly.
 
 ## API Routes
 ```
@@ -157,6 +174,7 @@ POST   /admin/upload-multiple      → Multi-file upload
 POST   /admin/process/{id}/stream  → Train with SSE progress
 POST   /admin/process/{id}/stop    → Stop training
 POST   /admin/sops/{id}/standardize → Standardize with SSE progress
+GET    /admin/sops/{id}/download/docx → Download standardized DOCX
 GET    /admin/sops/{id}/pages/{n}  → Render page as PNG
 GET    /admin/sops/{id}/versions   → Version history
 PUT    /admin/sops/{id}/pin        → Toggle pin
@@ -184,14 +202,16 @@ GET    /api/health                 → DB, disk, memory, OpenRouter, uptime
 - **O/0:** LLM letter O vs digit 0 normalized everywhere
 - **Uploads:** Type whitelist, 50MB limit, disk space check
 - **Passwords:** Special chars in DB_PASS auto URL-encoded
+- **Downloads:** `/download/` paths exempted from auth for browser access
 
 ## Production Infrastructure
 - Connection pooling (psycopg_pool) with `_PooledConnection` wrapper
-- `call_openrouter()` — 5 retries, exponential backoff (5s→60s)
+- `call_openrouter()` — 5-7 retries, exponential backoff (10s→90s), fallback model
+- JSON repair for truncated LLM responses
 - Structured JSON logging (timestamp, level, tenant_id, request_id)
 - Deep health check endpoint
 - Training continues on page refresh (background task)
-- Rate limit delays between pipeline LLM calls (3s gaps)
+- Rate limit delays between pipeline LLM calls (5s gaps)
 
 ## Docker
 ```bash

@@ -135,7 +135,12 @@ def extract_vision_pages(pdf_path: str, visual_pages: list, sop_id: str,
                 page = doc[page_num - 1]
                 mat = fitz.Matrix(200 / 72, 200 / 72)  # 200 DPI
                 pix = page.get_pixmap(matrix=mat)
-                img_bytes = pix.tobytes("png")
+                # Use JPEG for vision API (3-5x smaller than PNG, lower memory)
+                from io import BytesIO
+                _pil_img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+                _buf = BytesIO()
+                _pil_img.save(_buf, format="JPEG", quality=85)
+                img_bytes = _buf.getvalue()
                 b64 = base64.b64encode(img_bytes).decode("utf-8")
 
                 content_parts.append({"type": "text", "text": f"\n[Page {page_num}]:"})
@@ -158,7 +163,19 @@ def extract_vision_pages(pdf_path: str, visual_pages: list, sop_id: str,
                     raw = raw.split("```")[1]
                     if raw.startswith("json"):
                         raw = raw[4:]
-                parsed = json.loads(raw.strip())
+                # Try direct parse, then repair truncated JSON
+                raw_clean = raw.strip()
+                try:
+                    parsed = json.loads(raw_clean)
+                except json.JSONDecodeError:
+                    import re as _re
+                    repaired = _re.sub(r',\s*"[^"]*$', '', raw_clean)
+                    repaired = _re.sub(r':\s*"[^"]*$', ': ""', repaired)
+                    opens = repaired.count('{') - repaired.count('}')
+                    repaired = repaired.rstrip().rstrip(',') + '}' * max(0, opens)
+                    opens_arr = repaired.count('[') - repaired.count(']')
+                    repaired += ']' * max(0, opens_arr)
+                    parsed = json.loads(repaired)
 
                 # Handle both array and single object
                 if isinstance(parsed, dict):

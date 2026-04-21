@@ -838,8 +838,11 @@ async def standardize_doc(tenant_id: str, sop_id: str):
                 s = status_queue.get_nowait()
                 yield f"event: status\ndata: {json.dumps(s)}\n\n"
             result = task.result()
-            db.log_audit(tenant_id, "standardize_document", resource_type="sop", resource_id=sop_id, details=sop.get("title", ""))
-            yield f"event: done\ndata: {json.dumps(result)}\n\n"
+            if result and result.get("error"):
+                yield f"event: error\ndata: {json.dumps(result)}\n\n"
+            else:
+                db.log_audit(tenant_id, "standardize_document", resource_type="sop", resource_id=sop_id, details=sop.get("title", ""))
+                yield f"event: done\ndata: {json.dumps(result)}\n\n"
         except Exception as e:
             yield f"event: error\ndata: {json.dumps({'error': str(e)})}\n\n"
 

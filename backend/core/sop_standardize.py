@@ -28,7 +28,7 @@ def _get_template_context(department: str) -> str:
 
 
 def _call_llm(prompt: str, max_tokens: int = 8000) -> str:
-    return call_openrouter(prompt, model=ROUTER_MODEL, max_tokens=max_tokens, max_retries=5)
+    return call_openrouter(prompt, model=ROUTER_MODEL, max_tokens=max_tokens, max_retries=7)
 
 
 # ── AI: Tier-1 Consulting Structure ──────────────────────────────────────────
@@ -48,7 +48,7 @@ def _prepare_page_content(pages: list) -> tuple[list[str], list[int]]:
 
 
 def _parse_llm_json(result_text: str) -> dict:
-    """Parse JSON from LLM response, stripping markdown fences."""
+    """Parse JSON from LLM response with repair for truncated output."""
     result_text = result_text.strip()
     if result_text.startswith("```"):
         lines = result_text.split("\n")
@@ -56,7 +56,40 @@ def _parse_llm_json(result_text: str) -> dict:
         if result_text.rstrip().endswith("```"):
             result_text = result_text.rstrip()[:-3]
         result_text = result_text.strip()
-    return json.loads(result_text)
+
+    # Try direct parse first
+    try:
+        return json.loads(result_text)
+    except json.JSONDecodeError:
+        pass
+
+    # Repair truncated JSON — close open brackets/braces
+    repaired = result_text
+    # Remove trailing incomplete string (unterminated "...)
+    import re
+    repaired = re.sub(r',\s*"[^"]*$', '', repaired)  # Remove trailing incomplete key
+    repaired = re.sub(r':\s*"[^"]*$', ': ""', repaired)  # Close incomplete value
+    # Count and close open brackets
+    opens = repaired.count('{') - repaired.count('}')
+    repaired = repaired.rstrip().rstrip(',')
+    repaired += '}' * max(0, opens)
+    opens_arr = repaired.count('[') - repaired.count(']')
+    repaired += ']' * max(0, opens_arr)
+
+    try:
+        return json.loads(repaired)
+    except json.JSONDecodeError:
+        pass
+
+    # Last resort — extract any valid JSON object from the text
+    match = re.search(r'\{[\s\S]*\}', result_text)
+    if match:
+        try:
+            return json.loads(match.group())
+        except json.JSONDecodeError:
+            pass
+
+    raise json.JSONDecodeError("Cannot parse or repair LLM JSON", result_text, 0)
 
 
 # ── Chunked processing constants ──────────────────────────────────────────────
@@ -65,7 +98,7 @@ _PAGES_PER_CHUNK = 3
 # Max chars per chunk of content sent to LLM
 _CHUNK_CONTENT_LIMIT = 6000
 # Delay between LLM calls to avoid rate limits (seconds)
-_CHUNK_DELAY = 3
+_CHUNK_DELAY = 5
 
 
 def _build_continuation_prompt(title: str, department: str, chunk_content: str,
@@ -1013,6 +1046,58 @@ def standardize_sop(sop_id: str, tenant_id: str = None, on_status: Callable = No
     except Exception as e:
         logger.warning(f"DB update failed: {e}")
 
+    # ── Auto-embed standardized content for chat search ──────────────────
+    # Embeds as pages 900+ so agent finds BOTH raw (1-N) + standardized (900+)
+    _status("sop_standardize", f"Embedding standardized content for chat search...")
+    std_embedded = 0
+    try:
+        std_texts = []
+        # Procedure steps
+        for step in structured.get("procedure", []):
+            parts = [f"Step {step.get('step_number', '')}: {step.get('title', '')}"]
+            if step.get("activity"): parts.append(step["activity"])
+            if step.get("input"): parts.append(f"Input: {step['input']}")
+            if step.get("output"): parts.append(f"Output: {step['output']}")
+            if step.get("verification"): parts.append(f"Verification: {step['verification']}")
+            std_texts.append("\n".join(parts))
+        # Executive summary + definitions + RACI as one chunk
+        meta_parts = []
+        if structured.get("executive_summary"):
+            meta_parts.append(f"Executive Summary: {structured['executive_summary']}")
+        for d in structured.get("definitions", []):
+            if isinstance(d, dict):
+                meta_parts.append(f"{d.get('term', '')}: {d.get('definition', '')}")
+        for r in structured.get("raci", []):
+            if isinstance(r, dict):
+                meta_parts.append(f"RACI - {r.get('activity', '')}: R={r.get('responsible', '')} A={r.get('accountable', '')}")
+        for k in structured.get("kpis", []):
+            if isinstance(k, dict):
+                meta_parts.append(f"KPI - {k.get('metric', '')}: target {k.get('target', '')}")
+        if meta_parts:
+            std_texts.insert(0, "\n".join(meta_parts))
+
+        if std_texts:
+            from backend.core.config import get_openrouter_client, EMBEDDING_MODEL
+            client = get_openrouter_client()
+            for i in range(0, len(std_texts), 20):
+                batch = std_texts[i:i+20]
+                try:
+                    resp = client.embeddings.create(model=EMBEDDING_MODEL, input=batch)
+                    for j, emb in enumerate(resp.data):
+                        db.upsert_embedding(
+                            sop_id=sop_id, page=900+i+j, chunk_index=0,
+                            content=batch[j][:500], embedding=emb.embedding,
+                            metadata={"sop_id": sop_id, "page": 900+i+j, "source": "standardized"},
+                            tenant_id=tenant_id,
+                        )
+                        std_embedded += 1
+                except Exception as emb_err:
+                    logger.warning(f"Standardized embedding batch failed: {emb_err}")
+            _status("sop_standardize", f"  Embedded {std_embedded} standardized chunks for chat")
+    except Exception as e:
+        logger.warning(f"Standardized embedding failed: {e}")
+        _status("sop_standardize", f"  Embedding skipped: {e}")
+
     # Get agent name for status
     _agent_name = "Scout Agent"
     if tenant_id:
@@ -1030,4 +1115,5 @@ def standardize_sop(sop_id: str, tenant_id: str = None, on_status: Callable = No
     _status("sop_done", f"Download ready!")
 
     return {"status": "standardized", "sop_id": sop_id, "score": sop_score,
-            "steps": steps, "original_author": author, "gaps": gap, "docx_path": str(docx_path)}
+            "steps": steps, "original_author": author, "gaps": gap, "docx_path": str(docx_path),
+            "embeddings": std_embedded}

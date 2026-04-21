@@ -4,8 +4,10 @@ Full ingestion pipeline: Upload → Categorize → Index → Extract → Store
 from __future__ import annotations
 
 import json
+import logging
 import os
 import shutil
+import time as _time
 from pathlib import Path
 from datetime import datetime
 from typing import Optional
@@ -21,6 +23,8 @@ from backend.core.database import (
 )
 from backend.core import database as db
 from backend.core.categorize import categorize_document
+
+logger = logging.getLogger(__name__)
 
 os.environ["OPENROUTER_API_KEY"] = OPENROUTER_API_KEY
 
@@ -143,7 +147,7 @@ def _run_post_extraction(sop_id: str, category_id: str, page_count: int, screens
     try:
         from backend.core.database import embed_document_pages
         embedded = embed_document_pages(sop_id, tenant_id=tenant_id)
-        _status("embed_done", f"Embedded {embedded} pages")
+        _status("embed_done", f"Embedded {embedded} chunks")
     except Exception as e:
         _status("embed_error", f"Embedding error: {e}")
 
@@ -155,14 +159,15 @@ def _run_post_extraction(sop_id: str, category_id: str, page_count: int, screens
     except Exception as e:
         _status("compliance_error", f"Compliance error: {e}")
 
-    # SOP Standardization moved to trainer.py (runs after training + discovery, then re-embeds)
+    # Standardized embeddings are handled by standardize_sop() itself (pages 900+)
 
     _status("done", f"Done: {sop_id} → {category_id} ({page_count}p, {screenshot_count} imgs)")
     if tenant_id:
         try:
             db.log_usage(tenant_id, "process_document", cost_usd=0.01, metadata={"sop_id": sop_id, "pages": page_count})
             db.log_audit(tenant_id, "process_document", resource_type="sop", resource_id=sop_id, details=f"{page_count} pages, {screenshot_count} screenshots")
-        except Exception: pass
+        except Exception as e:
+            logger.warning(f"Failed to log usage: {e}")
 
 
 def process_pdf(pdf_path: str, sop_id: Optional[str] = None, on_status: Optional[callable] = None, tenant_id: str = None) -> dict:
@@ -296,8 +301,7 @@ def process_pdf(pdf_path: str, sop_id: Optional[str] = None, on_status: Optional
         _status("extracting", f"Image extraction error: {e}")
 
     # Brief pause to avoid OpenRouter rate limits between LLM-heavy steps
-    import time as _time
-    _time.sleep(3)
+    _time.sleep(5)
 
     # ── Step 5a: Enhance documentation ───────────────────────────────────
     _status("enhancing", "Enhancing documentation (text + screenshots → steps)...")
@@ -330,7 +334,7 @@ def process_pdf(pdf_path: str, sop_id: Optional[str] = None, on_status: Optional
 
     update_category_counts(tenant_id=tenant_id)
 
-    _time.sleep(3)  # Rate limit pause
+    _time.sleep(5)  # Rate limit pause
 
     # ── Step 6: Extract knowledge ────────────────────────────────────────
     _status("extracting_knowledge", "Extracting Q&A pairs and search keywords...")
@@ -356,38 +360,11 @@ def process_pdf(pdf_path: str, sop_id: Optional[str] = None, on_status: Optional
     try:
         from backend.core.database import embed_document_pages
         embedded_count = embed_document_pages(sop_id, tenant_id=tenant_id)
-        _status("embedding_done", f"Embedded {embedded_count} pages in PgVector")
+        _status("embedding_done", f"Embedded {embedded_count} chunks in PgVector")
     except Exception as e:
         _status("embedding_error", f"Embedding error: {e}")
 
-    # ── Step 7b: Feed standardized content into embeddings if available ──
-    sop_data = db.get_sop(sop_id, tenant_id=tenant_id)
-    std_json = sop_data.get("standardized_json") if sop_data else None
-    if std_json:
-        if isinstance(std_json, str):
-            try: std_json = json.loads(std_json)
-            except: std_json = None
-        if std_json and std_json.get("procedure"):
-            _status("embedding", "Adding standardized procedure steps to embeddings...")
-            std_texts = []
-            for step in std_json.get("procedure", []):
-                step_text = f"Step {step.get('step_number', '')}: {step.get('title', '')}\n{step.get('activity', '')}\nVerification: {step.get('verification', '')}"
-                std_texts.append(step_text)
-            if std_texts:
-                from backend.core.config import get_openrouter_client, EMBEDDING_MODEL
-                client = get_openrouter_client()
-                for i in range(0, len(std_texts), 20):
-                    batch = std_texts[i:i+20]
-                    try:
-                        resp = client.embeddings.create(model=EMBEDDING_MODEL, input=batch)
-                        for j, emb in enumerate(resp.data):
-                            db.upsert_embedding(sop_id=sop_id, page=900+i+j, chunk_index=0,
-                                content=batch[j][:500], embedding=emb.embedding,
-                                metadata={"sop_id": sop_id, "page": 900+i+j, "source": "standardized"},
-                                tenant_id=tenant_id)
-                    except: pass
-                embedded_count += len(std_texts)
-                _status("embedding", f"Added {len(std_texts)} standardized procedure embeddings")
+    # Standardized embeddings are handled by standardize_sop() itself (pages 900+)
 
     # ── Step 8: Compliance check ────────────────────────────────────────
     _status("compliance", "Running compliance check...")

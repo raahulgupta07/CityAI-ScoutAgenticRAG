@@ -85,158 +85,6 @@ def _run_single_training_query(agent, sop_id: str, title: str, question: str, in
         return {"question": question, "status": "error", "error": str(e)}
 
 
-def _update_pages_with_standardized(sop_id: str, tenant_id: str = None):
-    """
-    After SOP standardization, MERGE standardized content WITH original content.
-    Agent gets BOTH: structured standardized (primary) + raw original (fallback).
-    Format: [STANDARDIZED]\n...\n[ORIGINAL]\n...
-    Re-embeds in PgVector with the combined content for better search.
-    """
-    sop = db.get_sop(sop_id, tenant_id=tenant_id)
-    if not sop:
-        return
-
-    std_json = sop.get("standardized_json")
-    if isinstance(std_json, str):
-        try: std_json = json.loads(std_json)
-        except: return
-    if not std_json:
-        return
-
-    procedure = std_json.get("procedure", [])
-    if not procedure:
-        return
-
-    # Build standardized content per page
-    page_std = {}
-    for step in procedure:
-        source_page = step.get("source_page", 0)
-        if not source_page:
-            continue
-        if source_page not in page_std:
-            page_std[source_page] = []
-
-        step_text = f"Step {step.get('step_number', '')}: {step.get('title', '')}\n"
-        activity = step.get("activity", step.get("description", ""))
-        if activity:
-            step_text += f"{activity}\n"
-        s_input = step.get("input", "")
-        if s_input:
-            step_text += f"Input: {s_input}\n"
-        s_output = step.get("output", "")
-        if s_output:
-            step_text += f"Output: {s_output}\n"
-        expected = step.get("expected_result", "")
-        if expected:
-            step_text += f"Expected Result: {expected}\n"
-        verification = step.get("verification", "")
-        if verification:
-            step_text += f"Verification: {verification}\n"
-        warnings = step.get("warnings", "")
-        if warnings:
-            step_text += f"Warning: {warnings}\n"
-        page_std[source_page].append(step_text)
-
-    # Add executive summary, purpose, scope, definitions, RACI to page 1
-    page_1_extra = []
-    exec_summary = std_json.get("executive_summary", "")
-    if exec_summary:
-        page_1_extra.append(f"Executive Summary: {exec_summary}")
-    purpose = std_json.get("purpose", "")
-    if purpose:
-        page_1_extra.append(f"Purpose: {purpose}")
-    scope = std_json.get("scope", {})
-    if isinstance(scope, dict) and scope.get("description"):
-        page_1_extra.append(f"Scope: {scope['description']}")
-    # Add definitions
-    defs = std_json.get("definitions", [])
-    if defs:
-        def_text = "Key Definitions:\n"
-        for d in defs:
-            if isinstance(d, dict):
-                def_text += f"- {d.get('term', '')}: {d.get('definition', '')}\n"
-        page_1_extra.append(def_text)
-    # Add RACI summary
-    raci = std_json.get("raci", [])
-    if raci:
-        raci_text = "RACI Matrix:\n"
-        for r in raci:
-            if isinstance(r, dict):
-                raci_text += f"- {r.get('activity', '')}: R={r.get('responsible', '')} A={r.get('accountable', '')}\n"
-        page_1_extra.append(raci_text)
-    # Add KPIs
-    kpis = std_json.get("kpis", [])
-    if kpis:
-        kpi_text = "KPIs:\n"
-        for k in kpis:
-            if isinstance(k, dict):
-                kpi_text += f"- {k.get('metric', '')}: target {k.get('target', '')}\n"
-        page_1_extra.append(kpi_text)
-
-    if page_1_extra:
-        if 1 not in page_std:
-            page_std[1] = []
-        page_std[1] = page_1_extra + page_std.get(1, [])
-
-    # MERGE: Keep original content + prepend standardized content
-    updated_count = 0
-    conn = db.get_db(tenant_id)
-    try:
-        for page_num, std_texts in page_std.items():
-            std_combined = "\n\n".join(std_texts)
-            if not std_combined.strip():
-                continue
-
-            # Get current original content
-            row = conn.execute(
-                "SELECT enhanced_content, vision_content, text_content FROM page_content WHERE sop_id = %s AND page = %s",
-                (sop_id, page_num)
-            ).fetchone()
-
-            original = ""
-            if row:
-                original = row["enhanced_content"] or row["vision_content"] or row["text_content"] or ""
-
-            # Merge: standardized first (primary), original second (fallback)
-            merged = f"[STANDARDIZED CONTENT]\n{std_combined}"
-            if original.strip() and "[STANDARDIZED CONTENT]" not in original:
-                merged += f"\n\n[ORIGINAL CONTENT]\n{original}"
-
-            conn.execute(
-                "UPDATE page_content SET enhanced_content = %s WHERE sop_id = %s AND page = %s",
-                (merged, sop_id, page_num)
-            )
-            updated_count += 1
-        conn.commit()
-    finally:
-        conn.close()
-
-    _log("info", f"  Merged standardized + original content for {updated_count} pages")
-
-    # Re-embed with the combined content (agent searches BOTH)
-    try:
-        from backend.core.database import embed_document_pages
-        embedded = embed_document_pages(sop_id, tenant_id=tenant_id)
-        _log("info", f"  Re-embedded {embedded} pages in PgVector (combined content)")
-    except Exception as e:
-        _log("error", f"  Re-embedding failed: {e}")
-
-    # Update document summary
-    if exec_summary:
-        try:
-            conn = db.get_db(tenant_id)
-            try:
-                conn.execute(
-                    "UPDATE sops SET summary_short = %s, summary_detailed = %s WHERE sop_id = %s",
-                    (exec_summary[:200], exec_summary, sop_id)
-                )
-                conn.commit()
-            finally:
-                conn.close()
-        except Exception:
-            pass
-
-
 def _run_discovery_phase(sop_id: str, title: str, agent, tenant_id: str = None) -> int:
     """
     Self-Learning Discovery: Generate diverse queries from document content,
@@ -392,7 +240,7 @@ def train_on_document(sop_id: str, tenant_id: str = None, on_status=None) -> dic
     def _sub(msg):
         if on_status:
             try: on_status("training_sub", msg)
-            except: pass
+            except Exception: pass
 
     from backend.core.agent import get_agent
     agent = get_agent(tenant_id)
@@ -508,8 +356,7 @@ def process_and_train(pdf_path: str, sop_id: str, on_status=None, tenant_id: str
     train_result = train_on_document(sop_id, tenant_id=tenant_id, on_status=_notify)
     train_time = round(time.time() - t2, 1)
 
-    # Standardization removed from auto-pipeline — run manually via STANDARDIZE button
-    # This reduces 429 rate limit errors and speeds up training by ~30s
+    # Standardization is manual — user clicks STANDARDIZE button separately
     std_result = None
 
     # ── Wiki Synthesis — cross-document knowledge layer ──

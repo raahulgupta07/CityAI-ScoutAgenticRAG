@@ -142,7 +142,7 @@
 	<div class="grid grid-cols-5 gap-4">
 		{#each [
 			{ label: 'Tenants', value: tenants.length, sub: `${tenants.filter(t => t.is_active).length} active` },
-			{ label: 'Documents', value: stats.total_docs || 0, sub: `${stats.total_embeddings || 0} embeddings` },
+			{ label: 'Documents', value: stats.total_documents || 0, sub: `${stats.total_embeddings || 0} embeddings` },
 			{ label: 'Queries (30d)', value: stats.total_queries || 0, sub: `+${stats.total_queries_24h || 0} today` },
 			{ label: 'LLM Cost (30d)', value: `$${(usage.total_cost_usd || 0).toFixed(2)}`, sub: `${usage.total_operations || 0} operations`, highlight: true },
 			{ label: 'DB Size', value: `${stats.db_size_mb || 0}`, valueSuffix: 'MB', sub: `${stats.storage_mb || 0}MB files` },

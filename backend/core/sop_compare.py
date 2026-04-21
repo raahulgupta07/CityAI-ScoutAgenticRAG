@@ -25,10 +25,10 @@ def compare_sops(sop_id_old: str, sop_id_new: str, tenant_id: str = None) -> dic
 
     if isinstance(old_json, str):
         try: old_json = json.loads(old_json)
-        except: old_json = None
+        except (json.JSONDecodeError, TypeError, ValueError): old_json = None
     if isinstance(new_json, str):
         try: new_json = json.loads(new_json)
-        except: new_json = None
+        except (json.JSONDecodeError, TypeError, ValueError): new_json = None
 
     if not old_json:
         return {"error": f"{sop_id_old} has no standardized version. Standardize it first."}

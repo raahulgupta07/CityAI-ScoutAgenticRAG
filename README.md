@@ -20,7 +20,7 @@ open http://localhost:8080
 1. **Super admin** creates a tenant (company) at `/`
 2. **Tenant admin** uploads documents at `/t/{id}/admin`
 3. Click **TRAIN** → 11-step pipeline: categorize → vision extract → screenshots → enhance → knowledge (30-50 Q&A) → embed → compliance → auto-train → self-learn → wiki
-4. Click **STANDARDIZE** (optional) → AI generates consulting-grade DOCX (McKinsey/Deloitte frameworks)
+4. Click **STANDARDIZE** (optional) → AI generates consulting-grade DOCX + auto-embeds for chat search
 5. **Users chat** at `/c/{token}` — agent answers from documents only, with inline citations and screenshots
 6. **Agent self-learns** — saves successful routes, learns from feedback, gets faster with every query
 
@@ -28,7 +28,7 @@ open http://localhost:8080
 
 ```
 Super Admin (SvelteKit)     Tenant Admin (HTML)        Public Chat
-/  /monitoring  /system     /t/{id}/admin (7 tabs)     /c/{token}
+/  /monitoring  /system     /t/{id}/admin (6 tabs)     /c/{token}
         │                           │                      │
         └───────────────────────────┼──────────────────────┘
                                     ▼
@@ -70,6 +70,18 @@ Super Admin (SvelteKit)     Tenant Admin (HTML)        Public Chat
 
 Visual step tracker + progress bar + ETA countdown + browser notification when done.
 
+## Standardization (what happens when you click STANDARDIZE)
+
+```
+Reads page_content → AI analysis in 3-page chunks → DOCX generation
+→ McKinsey/Deloitte/Accenture/PwC frameworks
+→ Gap analysis: original score → standardized score
+→ Auto-embeds procedures as pages 900+ for chat search
+→ Handles 100+ page documents (chunked LLM calls, 5s gaps)
+```
+
+Both raw (pages 1-N) and standardized (pages 900+) content are searchable in chat.
+
 ## Features
 
 - **12-tool Agno agent** — intent routing, wiki, hybrid vector+BM25 search, visual PDF reading, screenshots, discovery
@@ -77,6 +89,7 @@ Visual step tracker + progress bar + ETA countdown + browser notification when d
 - **Chunk-level Embeddings** — 400-token chunks with overlap
 - **Visual PDF Reading** — agent can render PDF pages and send to Gemini vision for charts/tables
 - **Document Standardizer** — McKinsey/Deloitte/Accenture/PwC frameworks → DOCX (handles 100+ pages)
+- **5-Layer Error Defense** — smart retries, fallback model, JSON repair, graceful skip, honest status
 - **Document Versioning** — upload v2 keeps v1 history
 - **Multi-file Upload** — drag & drop multiple files
 - **Pin/Star Documents** — pinned sort to top
@@ -91,7 +104,8 @@ Visual step tracker + progress bar + ETA countdown + browser notification when d
 - **Starter Question Cards** — ChatGPT-style cards from trained Q&A
 - **Answer Quality Scoring** — auto-scored 0-100 per response
 - **Export Chat as PDF** — print dialog with formatting
-- **Follow-up Suggestions** — 3 contextual questions after each answer
+- **Follow-up Suggestions** — hybrid: instant DB + LLM smart (3s timeout)
+- **Side-by-side PDF Viewer** — chat shrinks left, PDF opens right (no overlap)
 - **Analytics Dashboard** — charts, top queries, failed queries
 - **Scheduled Re-Training** — daily/weekly/monthly auto-retrain
 - **Deep Health Check** — DB, disk, memory, OpenRouter, uptime
@@ -109,22 +123,6 @@ Visual step tracker + progress bar + ETA countdown + browser notification when d
 | Feedback Learning | 0.2s | $0 | Thumbs up creates routes, down creates negative |
 | Agent Persona | - | $0.003 | Auto-generated system prompt |
 
-## Chat Widget
-
-Single `chat-widget.js` powers both admin and public chat:
-
-- SSE streaming with tool step visualization
-- **Starter question cards** — 2x2 grid from trained Q&A
-- Inline citations `[REF:doc:page]` → clickable, opens PDF viewer
-- Screenshots `[IMG:page:index]` → rendered inline (auto-injected for cited pages)
-- PDF viewer with page images (click outside to close)
-- Feedback with reason popup
-- Follow-up suggestions
-- **Export as PDF** — print dialog with formatting
-- Multi-turn conversation history
-- localStorage persistence (1hr TTL)
-- Mobile responsive
-
 ## Tech Stack
 
 | Component | Technology |
@@ -133,11 +131,12 @@ Single `chat-widget.js` powers both admin and public chat:
 | Agent | Agno (12 tools + self-learning + visual PDF reading) |
 | Super Admin | SvelteKit + Tailwind CSS |
 | Tenant Admin | Standalone HTML (Brutalist design) |
-| Chat Widget | Shared JS (admin + public) |
+| Chat Widget | Shared JS (admin + public, side-by-side PDF) |
 | Database | PostgreSQL 18 + PgVector |
 | DB Pool | psycopg_pool (min=2, max=10, auto-reset) |
-| LLM (pipeline) | Gemini 2.0 Flash via OpenRouter (env-configurable) |
+| LLM (pipeline) | Gemini 3.1 Flash Lite via OpenRouter (env-configurable) |
 | LLM (chat) | Gemini 3 Flash via OpenRouter (env-configurable) |
+| LLM (fallback) | Gemini 2.0 Flash (auto-switch on failure) |
 | Embeddings | text-embedding-3-small via OpenRouter |
 | Retrieval | Hybrid BM25 + Vector with RRF fusion |
 | Wiki | Karpathy LLM Wiki pattern |
@@ -172,8 +171,9 @@ DB_DATABASE=scoutragdb
 ADMIN_USER=admin
 ADMIN_PASS=admin123
 PORT=80
-ROUTER_MODEL=google/gemini-2.0-flash-001
+ROUTER_MODEL=google/gemini-3.1-flash-lite-preview
 VISION_MODEL=google/gemini-3-flash-preview
+FALLBACK_MODEL=google/gemini-2.0-flash-001
 EMBEDDING_MODEL=text-embedding-3-small
 LOG_LEVEL=INFO
 ```
@@ -194,7 +194,7 @@ curl http://localhost:8080/api/health  # Health check
 2. **Upload** — drag PDF, see TRAIN + DELETE buttons
 3. **Train** — click TRAIN, watch step tracker + progress bar + ETA
 4. **Standardize** — click STANDARDIZE, watch terminal, download DOCX
-5. **Chat** — starter cards, ask question, see citations + screenshots
+5. **Chat** — starter cards, ask question, see citations + screenshots + side-by-side PDF
 6. **Public Chat** — open embed URL, same features work
 7. **Bulk Ops** — Train All, pin docs, bulk delete, tag filter
 8. **Analytics** — Logs tab shows charts + top queries
@@ -202,4 +202,4 @@ curl http://localhost:8080/api/health  # Health check
 
 ## License
 
-Private — Scout AI
+Private — RLAI

@@ -15,12 +15,91 @@ from backend.models.schemas import ChatRequest
 from backend.core.agent import ask, generate_suggestions
 from backend.core import database as db
 from backend.core.tools import set_status_queue
+import random
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
 
 
 _UNCERTAINTY_PHRASES = ("i'm not sure", "i don't have", "no matching", "not found")
+
+
+def _db_suggestions(question: str, sources: list, tenant_id: str) -> list:
+    """Get related Q&A pairs from DB — instant, $0."""
+    suggestions = []
+    asked_lower = question.lower().strip("? ")
+
+    for src in sources[:3]:
+        sop_id = src.get("sop_id", "")
+        if not sop_id:
+            continue
+        try:
+            sop = db.get_sop(sop_id, tenant_id=tenant_id)
+            if not sop:
+                continue
+            qa_pairs = sop.get("qa_pairs", [])
+            if isinstance(qa_pairs, str):
+                import json as _json
+                try: qa_pairs = _json.loads(qa_pairs)
+                except: qa_pairs = []
+            for qa in qa_pairs:
+                q = qa.get("question", qa) if isinstance(qa, dict) else str(qa)
+                if not isinstance(q, str) or len(q) < 10:
+                    continue
+                if q.lower().strip("? ") == asked_lower:
+                    continue
+                suggestions.append(q)
+        except Exception:
+            continue
+
+    # Deduplicate
+    seen = set()
+    unique = []
+    for s in suggestions:
+        key = s.lower().strip("? ")
+        if key not in seen:
+            seen.add(key)
+            unique.append(s)
+    random.shuffle(unique)
+    return unique
+
+
+def _instant_suggestions(question: str, answer: str, sources: list, tenant_id: str) -> list:
+    """Hybrid: 2 from DB (instant) + 1 from LLM (3s timeout). Fast + smart."""
+    # Get DB suggestions instantly
+    db_sugs = _db_suggestions(question, sources, tenant_id)
+
+    # Fire LLM call in background with 3s timeout
+    llm_sugs = []
+    try:
+        with ThreadPoolExecutor(max_workers=1) as executor:
+            future = executor.submit(generate_suggestions, question, answer, sources)
+            try:
+                llm_sugs = future.result(timeout=3)
+            except (FuturesTimeout, Exception):
+                pass
+    except Exception:
+        pass
+
+    # Merge: deduplicate, LLM suggestions first (smarter), then DB
+    asked_lower = question.lower().strip("? ")
+    seen = {asked_lower}
+    merged = []
+
+    for s in llm_sugs:
+        key = s.lower().strip("? ")
+        if key not in seen:
+            seen.add(key)
+            merged.append(s)
+
+    for s in db_sugs:
+        key = s.lower().strip("? ")
+        if key not in seen:
+            seen.add(key)
+            merged.append(s)
+
+    return merged[:3]
 
 
 def score_answer_quality(answer: str, sources: list, question: str) -> int:
@@ -152,15 +231,13 @@ async def chat_event_stream(request: ChatRequest, tenant_id: str = None):
                 }
             yield f"event: images\ndata: {json.dumps({'image_map': image_map_urls})}\n\n"
 
-        # Generate follow-up suggestions
+        # Generate follow-up suggestions instantly from DB (no LLM call)
         try:
-            suggestions = await loop.run_in_executor(
-                None,
-                lambda: generate_suggestions(
-                    request.question,
-                    result["answer"],
-                    result.get("sources", []),
-                )
+            suggestions = _instant_suggestions(
+                request.question,
+                result["answer"],
+                result.get("sources", []),
+                tenant_id,
             )
             if suggestions:
                 yield f"event: suggestions\ndata: {json.dumps({'suggestions': suggestions})}\n\n"
