@@ -248,6 +248,9 @@ const STATE = {
     lastSources: [],
     history: [],  // last N Q&A pairs for multi-turn context
     escalation: null,  // {team, email, phone, url, chat, hours, sla, priority, message, always}
+    chatLoginRequired: false,
+    chatUserToken: null,
+    chatUserEmail: '',
 };
 
 /* ── Helpers ──────────────────────────────────────────────────────────────── */
@@ -502,11 +505,19 @@ async function sendMsg() {
     let answer = '', suggestions = [], sources = [], model = '', imageMap = {}, queryId = 0;
 
     try {
+        const chatHeaders = { 'Content-Type': 'application/json' };
+        if (STATE.chatUserToken) chatHeaders['Authorization'] = 'Bearer ' + STATE.chatUserToken;
         const res = await fetch(STATE.chatApi, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: chatHeaders,
             body: JSON.stringify({ question: q, history: STATE.history.slice(-5) }),
         });
+        if (res.status === 401) {
+            localStorage.removeItem('cw_chat_token_' + STATE.tenantId);
+            STATE.chatUserToken = null;
+            _showLoginForm();
+            return;
+        }
         if (!res.ok) throw new Error('Server returned ' + res.status);
         if (!res.body) throw new Error('No response body');
         const reader = res.body.getReader();
@@ -677,9 +688,11 @@ function sendFeedback(btn, type, qId) {
 
     if (type === 'up') {
         // Instant save — no popup
+        const fbHeaders = { 'Content-Type': 'application/json' };
+        if (STATE.chatUserToken) fbHeaders['Authorization'] = 'Bearer ' + STATE.chatUserToken;
         fetch(STATE.feedbackApi, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: fbHeaders,
             body: JSON.stringify({ query_id: qId || 0, feedback: 'up' }),
         }).catch(()=>{});
         return;
@@ -716,9 +729,11 @@ function sendFeedback(btn, type, qId) {
     popup.querySelector('.cw-fb-submit').onclick = () => {
         const details = popup.querySelector('textarea').value.trim();
         const comment = [selectedReason, details].filter(Boolean).join(': ');
+        const fbDownHeaders = { 'Content-Type': 'application/json' };
+        if (STATE.chatUserToken) fbDownHeaders['Authorization'] = 'Bearer ' + STATE.chatUserToken;
         fetch(STATE.feedbackApi, {
             method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
+            headers: fbDownHeaders,
             body: JSON.stringify({ query_id: qId || 0, feedback: 'down', comment: comment }),
         }).catch(()=>{});
         popup.innerHTML = '<div style="font-size:10px;font-weight:900;color:#007518;text-transform:uppercase;padding:4px 0">FEEDBACK SUBMITTED</div>';
@@ -831,6 +846,134 @@ function closePdf() {
     setTimeout(() => { if (STATE.messagesEl) STATE.messagesEl.scrollTop = STATE.messagesEl.scrollHeight; }, 300);
 }
 
+/* ── Login / Register ─────────────────────────────────────────────────────── */
+function _showLoginForm() {
+    const root = document.getElementById('cw-root');
+    if (!root) return;
+    const name = STATE.agentName || 'Document Agent';
+    root.innerHTML = `
+        <div class="cw-header">
+            <div style="display:flex;align-items:center;gap:10px">
+                <div class="cw-header-icon"><span class="material-symbols-outlined" style="font-size:20px;color:#00fc40">smart_toy</span></div>
+                <span class="cw-header-name">${esc(name)}</span>
+            </div>
+        </div>
+        <div style="flex:1;display:flex;align-items:center;justify-content:center;padding:32px">
+            <div id="cw-login-box" style="width:100%;max-width:360px">
+                <div id="cw-login-form">
+                    <h2 style="font-size:20px;font-weight:900;text-transform:uppercase;color:#383832;margin:0 0 4px 0;font-family:'Space Grotesk',sans-serif">Sign In</h2>
+                    <p style="font-size:12px;color:#65655e;margin:0 0 24px 0">Login to access the chat</p>
+                    <div id="cw-login-error" style="display:none;padding:8px 12px;background:#fce4ec;color:#be2d06;font-size:11px;font-weight:700;margin-bottom:12px"></div>
+                    <div style="margin-bottom:12px">
+                        <label style="font-size:10px;font-weight:900;text-transform:uppercase;color:#65655e;display:block;margin-bottom:4px">Email</label>
+                        <input id="cw-login-email" type="email" placeholder="you@company.com" style="width:100%;padding:10px 12px;border:2px solid #383832;font-size:13px;font-family:'Space Grotesk',sans-serif;outline:none;box-sizing:border-box" onkeydown="if(event.key==='Enter')document.getElementById('cw-login-pass').focus()">
+                    </div>
+                    <div style="margin-bottom:20px">
+                        <label style="font-size:10px;font-weight:900;text-transform:uppercase;color:#65655e;display:block;margin-bottom:4px">Password</label>
+                        <input id="cw-login-pass" type="password" placeholder="••••••••" style="width:100%;padding:10px 12px;border:2px solid #383832;font-size:13px;font-family:'Space Grotesk',sans-serif;outline:none;box-sizing:border-box" onkeydown="if(event.key==='Enter')ChatWidget.loginSubmit()">
+                    </div>
+                    <button onclick="ChatWidget.loginSubmit()" style="width:100%;padding:12px;background:#00fc40;border:2px solid #383832;color:#383832;font-size:12px;font-weight:900;text-transform:uppercase;cursor:pointer;font-family:'Space Grotesk',sans-serif;box-shadow:4px 4px 0 #383832;letter-spacing:0.05em">Login</button>
+                    <p style="text-align:center;margin-top:16px;font-size:11px;color:#65655e">Don't have access? <a href="#" onclick="event.preventDefault();ChatWidget._showRegister()" style="color:#007518;font-weight:900;text-decoration:none">Request Access</a></p>
+                </div>
+            </div>
+        </div>
+        <div class="cw-footer">${esc(name)} — Login required</div>
+    `;
+}
+
+function _showRegisterForm() {
+    const box = document.getElementById('cw-login-box');
+    if (!box) return;
+    box.innerHTML = `
+        <h2 style="font-size:20px;font-weight:900;text-transform:uppercase;color:#383832;margin:0 0 4px 0;font-family:'Space Grotesk',sans-serif">Request Access</h2>
+        <p style="font-size:12px;color:#65655e;margin:0 0 24px 0">Submit a request to chat with the agent</p>
+        <div id="cw-reg-error" style="display:none;padding:8px 12px;background:#fce4ec;color:#be2d06;font-size:11px;font-weight:700;margin-bottom:12px"></div>
+        <div style="margin-bottom:12px">
+            <label style="font-size:10px;font-weight:900;text-transform:uppercase;color:#65655e;display:block;margin-bottom:4px">Full Name</label>
+            <input id="cw-reg-name" type="text" placeholder="John Smith" style="width:100%;padding:10px 12px;border:2px solid #383832;font-size:13px;font-family:'Space Grotesk',sans-serif;outline:none;box-sizing:border-box">
+        </div>
+        <div style="margin-bottom:12px">
+            <label style="font-size:10px;font-weight:900;text-transform:uppercase;color:#65655e;display:block;margin-bottom:4px">Email</label>
+            <input id="cw-reg-email" type="email" placeholder="you@company.com" style="width:100%;padding:10px 12px;border:2px solid #383832;font-size:13px;font-family:'Space Grotesk',sans-serif;outline:none;box-sizing:border-box">
+        </div>
+        <div style="margin-bottom:12px">
+            <label style="font-size:10px;font-weight:900;text-transform:uppercase;color:#65655e;display:block;margin-bottom:4px">Password</label>
+            <input id="cw-reg-pass" type="password" placeholder="••••••••" style="width:100%;padding:10px 12px;border:2px solid #383832;font-size:13px;font-family:'Space Grotesk',sans-serif;outline:none;box-sizing:border-box">
+        </div>
+        <div style="margin-bottom:20px">
+            <label style="font-size:10px;font-weight:900;text-transform:uppercase;color:#65655e;display:block;margin-bottom:4px">Reason (optional)</label>
+            <input id="cw-reg-reason" type="text" placeholder="Need access to IT documentation" style="width:100%;padding:10px 12px;border:2px solid #383832;font-size:13px;font-family:'Space Grotesk',sans-serif;outline:none;box-sizing:border-box" onkeydown="if(event.key==='Enter')ChatWidget.registerSubmit()">
+        </div>
+        <button onclick="ChatWidget.registerSubmit()" style="width:100%;padding:12px;background:#00fc40;border:2px solid #383832;color:#383832;font-size:12px;font-weight:900;text-transform:uppercase;cursor:pointer;font-family:'Space Grotesk',sans-serif;box-shadow:4px 4px 0 #383832;letter-spacing:0.05em">Request Access</button>
+        <p style="text-align:center;margin-top:16px;font-size:11px;color:#65655e">Already have access? <a href="#" onclick="event.preventDefault();ChatWidget._showLogin()" style="color:#007518;font-weight:900;text-decoration:none">Sign In</a></p>
+    `;
+}
+
+function _showPendingMessage() {
+    const box = document.getElementById('cw-login-box');
+    if (!box) return;
+    box.innerHTML = `
+        <div style="text-align:center">
+            <span class="material-symbols-outlined" style="font-size:48px;color:#ff9d00;margin-bottom:16px;display:block">hourglass_top</span>
+            <h2 style="font-size:18px;font-weight:900;text-transform:uppercase;color:#383832;margin:0 0 8px 0;font-family:'Space Grotesk',sans-serif">Access Request Submitted</h2>
+            <p style="font-size:13px;color:#65655e;margin:0 0 24px 0;line-height:1.6">Your request has been sent to the admin for approval.<br>You'll be able to login once approved.</p>
+            <button onclick="ChatWidget._showLogin()" style="padding:10px 24px;background:transparent;border:2px solid #383832;color:#383832;font-size:11px;font-weight:900;text-transform:uppercase;cursor:pointer;font-family:'Space Grotesk',sans-serif">Back to Login</button>
+        </div>
+    `;
+}
+
+function _showChat() {
+    // Re-initialize the chat UI (rebuild HTML and setup)
+    const container = STATE.container;
+    container.innerHTML = buildHTML();
+    STATE.messagesEl = document.getElementById('cw-messages');
+    STATE.inputEl = document.getElementById('cw-input');
+    STATE.sendBtn = document.getElementById('cw-send-btn');
+    STATE.pdfPanel = document.getElementById('cw-pdf-panel');
+    // Re-setup event listeners (auto-resize, scroll button, etc)
+    STATE.inputEl.addEventListener('input', () => {
+        STATE.inputEl.style.height = 'auto';
+        STATE.inputEl.style.height = Math.min(STATE.inputEl.scrollHeight, 120) + 'px';
+    });
+
+    // Restore previous session
+    const hasRestoredSession = restoreMessages();
+
+    // Load starter cards
+    if (STATE.tenantId && !hasRestoredSession) {
+        const starterUrl = '/api/t/' + STATE.tenantId + '/admin/starter-questions?limit=4';
+        fetch(starterUrl).then(r => r.ok ? r.json() : []).then(questions => {
+            const sc = document.getElementById('cw-starter-cards');
+            if (!sc || !questions.length) return;
+            const icons = ['chat_bubble', 'help', 'search', 'description'];
+            sc.className = 'cw-starter-grid';
+            sc.innerHTML = questions.slice(0, 4).map((q, i) => {
+                const safeQ = q.question.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
+                return '<div class="cw-starter-card" onclick="ChatWidget.askStarter(\'' + safeQ.replace(/\\/g,'\\\\') + '\')">'
+                    + '<div class="cw-starter-icon"><span class="material-symbols-outlined">' + icons[i % 4] + '</span></div>'
+                    + '<div class="cw-starter-q">' + esc(q.question) + '</div>'
+                    + '<div class="cw-starter-src">' + esc(q.title || q.sop_id) + '</div>'
+                    + '</div>';
+            }).join('');
+        }).catch(() => {});
+    }
+
+    // Scroll-to-bottom button + PDF close on empty area click
+    STATE.messagesEl.addEventListener('click', (e) => {
+        const panel = document.getElementById('cw-pdf-panel');
+        if (!panel || !panel.classList.contains('cw-open')) return;
+        if (e.target.closest('.cw-cite-ref, .cw-source-badge, .cw-ref-thumb, .cw-screenshot, .cw-ref-pages, [onclick*="openPdf"]')) return;
+        const tag = e.target.tagName;
+        if (tag === 'SUP' || tag === 'SPAN' || tag === 'IMG') return;
+        closePdf();
+    });
+    STATE.messagesEl.addEventListener('scroll', () => {
+        const el = STATE.messagesEl;
+        const btn = document.getElementById('cw-scroll-btn');
+        if (btn) btn.style.display = (el.scrollHeight - el.scrollTop - el.clientHeight > 200) ? 'flex' : 'none';
+    });
+}
+
 /* ── Public API ───────────────────────────────────────────────────────────── */
 window.ChatWidget = {
     init: function(opts) {
@@ -845,6 +988,7 @@ window.ChatWidget = {
         STATE.logoUrl = opts.logoUrl || '';
         STATE.allDocs = opts.allDocs || [];
         STATE.escalation = opts.escalation || null;
+        STATE.chatLoginRequired = opts.chatLoginRequired || false;
 
         const container = opts.container;
         container.style.display = 'flex';
@@ -862,6 +1006,30 @@ window.ChatWidget = {
             STATE.inputEl.style.height = 'auto';
             STATE.inputEl.style.height = Math.min(STATE.inputEl.scrollHeight, 120) + 'px';
         });
+
+        // If chat login required, check for existing token or show login form
+        if (STATE.chatLoginRequired) {
+            const savedToken = localStorage.getItem('cw_chat_token_' + STATE.tenantId);
+            if (savedToken) {
+                // Validate saved token
+                fetch('/api/t/' + STATE.tenantId + '/chat-auth/check', {
+                    headers: {'Authorization': 'Bearer ' + savedToken}
+                }).then(r => r.json()).then(data => {
+                    if (data.authenticated) {
+                        STATE.chatUserToken = savedToken;
+                        STATE.chatUserEmail = data.email || '';
+                        _showChat();
+                    } else {
+                        localStorage.removeItem('cw_chat_token_' + STATE.tenantId);
+                        _showLoginForm();
+                    }
+                }).catch(() => _showLoginForm());
+                return; // Don't proceed to chat yet
+            } else {
+                _showLoginForm();
+                return;
+            }
+        }
 
         // Restore previous session
         const hasRestoredSession = restoreMessages();
@@ -948,6 +1116,55 @@ window.ChatWidget = {
     closePdf: closePdf,
     feedback: sendFeedback,
     copy: copyText,
+
+    // Login / Register
+    loginSubmit: function() {
+        const email = document.getElementById('cw-login-email').value.trim();
+        const pass = document.getElementById('cw-login-pass').value;
+        const errEl = document.getElementById('cw-login-error');
+        if (!email || !pass) { errEl.textContent = 'Email and password required'; errEl.style.display = 'block'; return; }
+        errEl.style.display = 'none';
+        fetch('/api/t/' + STATE.tenantId + '/chat-auth/login', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({email, password: pass})
+        }).then(r => r.json()).then(data => {
+            if (data.error) {
+                errEl.textContent = data.error;
+                errEl.style.display = 'block';
+                return;
+            }
+            STATE.chatUserToken = data.token;
+            STATE.chatUserEmail = data.email;
+            localStorage.setItem('cw_chat_token_' + STATE.tenantId, data.token);
+            _showChat();
+        }).catch(e => { errEl.textContent = 'Login failed'; errEl.style.display = 'block'; });
+    },
+
+    registerSubmit: function() {
+        const name = document.getElementById('cw-reg-name').value.trim();
+        const email = document.getElementById('cw-reg-email').value.trim();
+        const pass = document.getElementById('cw-reg-pass').value;
+        const reason = document.getElementById('cw-reg-reason').value.trim();
+        const errEl = document.getElementById('cw-reg-error');
+        if (!email || !pass) { errEl.textContent = 'Email and password required'; errEl.style.display = 'block'; return; }
+        errEl.style.display = 'none';
+        fetch('/api/t/' + STATE.tenantId + '/chat-auth/register', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({email, password: pass, name, reason})
+        }).then(r => r.json()).then(data => {
+            if (data.error) {
+                errEl.textContent = data.error;
+                errEl.style.display = 'block';
+                return;
+            }
+            _showPendingMessage();
+        }).catch(e => { errEl.textContent = 'Registration failed'; errEl.style.display = 'block'; });
+    },
+
+    _showLogin: function() { _showLoginForm(); },
+    _showRegister: function() { _showRegisterForm(); },
 
     // Allow admin to update allDocs dynamically
     setDocs: function(docs) { STATE.allDocs = docs; },

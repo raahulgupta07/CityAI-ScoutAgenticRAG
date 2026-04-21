@@ -9,8 +9,8 @@ import threading
 from queue import Queue
 from typing import Optional
 from pathlib import Path
-from fastapi import APIRouter, Body, Query, UploadFile, File
-from fastapi.responses import Response, StreamingResponse
+from fastapi import APIRouter, Body, Query, Request, UploadFile, File
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 
 from backend.core import database as db
 
@@ -1103,3 +1103,87 @@ async def gen_persona(tenant_id: str):
     from backend.core.wiki import generate_persona
     loop = asyncio.get_event_loop()
     return await loop.run_in_executor(None, lambda: generate_persona(tenant_id))
+
+
+# ── Chat User Management ─────────────────────────────────────────────────────
+
+@router.get("/chat-users")
+async def list_chat_users_route(tenant_id: str, status: str = None):
+    """List chat users for this tenant."""
+    users = db.list_chat_users(tenant_id, status=status)
+    # Convert datetime objects to strings for JSON
+    for u in users:
+        for k in ("created_at", "approved_at", "last_login_at"):
+            if u.get(k) and hasattr(u[k], "isoformat"):
+                u[k] = u[k].isoformat()
+    return users
+
+@router.get("/chat-users/pending-count")
+async def pending_count(tenant_id: str):
+    """Count pending access requests."""
+    return {"count": db.count_pending_chat_users(tenant_id)}
+
+@router.post("/chat-users")
+async def create_chat_user_route(tenant_id: str, request: Request):
+    """Tenant admin creates a user directly (status=active)."""
+    body = await request.json()
+    email = body.get("email", "").strip().lower()
+    password = body.get("password", "")
+    display_name = body.get("display_name", "")
+    if not email or not password:
+        return JSONResponse({"error": "Email and password required"}, status_code=400)
+    existing = db.get_chat_user(tenant_id, email)
+    if existing:
+        return JSONResponse({"error": "User already exists"}, status_code=409)
+    result = db.create_chat_user(tenant_id, email, password, display_name, status="active", created_by="admin")
+    db.log_audit(tenant_id, "create_chat_user", resource_type="chat_user", resource_id=email)
+    return result
+
+@router.put("/chat-users/{user_id}/approve")
+async def approve_chat_user(tenant_id: str, user_id: int):
+    """Approve a pending access request."""
+    db.update_chat_user_status(user_id, "active")
+    db.log_audit(tenant_id, "approve_chat_user", resource_type="chat_user", resource_id=str(user_id))
+    return {"status": "approved"}
+
+@router.put("/chat-users/{user_id}/reject")
+async def reject_chat_user(tenant_id: str, user_id: int):
+    """Reject a pending access request."""
+    db.update_chat_user_status(user_id, "rejected")
+    db.log_audit(tenant_id, "reject_chat_user", resource_type="chat_user", resource_id=str(user_id))
+    return {"status": "rejected"}
+
+@router.put("/chat-users/{user_id}/disable")
+async def disable_chat_user(tenant_id: str, user_id: int):
+    """Disable an active user."""
+    db.update_chat_user_status(user_id, "disabled")
+    db.log_audit(tenant_id, "disable_chat_user", resource_type="chat_user", resource_id=str(user_id))
+    return {"status": "disabled"}
+
+@router.delete("/chat-users/{user_id}")
+async def delete_chat_user_route(tenant_id: str, user_id: int):
+    """Delete a chat user."""
+    db.delete_chat_user(user_id)
+    db.log_audit(tenant_id, "delete_chat_user", resource_type="chat_user", resource_id=str(user_id))
+    return {"status": "deleted"}
+
+@router.get("/chat-login-required")
+async def get_chat_login_required(tenant_id: str):
+    """Get chat login required setting."""
+    tenant = db.get_tenant(tenant_id)
+    _clr = tenant.get("chat_login_required", False) if tenant else False
+    return {"required": _clr is True or _clr == "true" or _clr == "TRUE"}
+
+@router.put("/chat-login-required")
+async def set_chat_login_required(tenant_id: str, request: Request):
+    """Toggle chat login required."""
+    body = await request.json()
+    required = body.get("required", False)
+    conn = db.get_db()
+    try:
+        conn.execute("UPDATE tenants SET chat_login_required = %s WHERE id = %s", (required, tenant_id))
+        conn.commit()
+    finally:
+        conn.close()
+    db.log_audit(tenant_id, "set_chat_login_required", details=f"required={required}")
+    return {"required": required}

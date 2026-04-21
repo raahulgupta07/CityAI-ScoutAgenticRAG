@@ -105,10 +105,12 @@ def _ensure_tokens_table():
     except Exception as _e:
         logger.debug(f"Token op: {_e}")
 
-def _create_token(token_type: str = "super", tenant_id: str = None) -> str:
+def _create_token(token_type: str = "super", tenant_id: str = None, email: str = None) -> str:
     token = secrets.token_urlsafe(32)
     expiry = time.time() + 86400
     info = {"expiry": expiry, "type": token_type, "tenant_id": tenant_id}
+    if email:
+        info["email"] = email
     _token_cache[token] = info
     try:
         from backend.core.database import get_db
@@ -414,6 +416,65 @@ async def tenant_admin_page(tenant_id: str):
     html = html.replace("__TENANT_ID__", tenant_id)
     return Response(content=html, media_type="text/html")
 
+@app.post("/api/t/{tenant_id}/chat-auth/login")
+async def chat_user_login(tenant_id: str, request: Request):
+    """Chat user login — returns token if valid."""
+    body = await request.json()
+    email = body.get("email", "").strip().lower()
+    password = body.get("password", "")
+    if not email or not password:
+        return JSONResponse({"error": "Email and password required"}, status_code=400)
+    from backend.core import database as db
+    result = db.verify_chat_user(tenant_id, email, password)
+    if not result:
+        return JSONResponse({"error": "Invalid email or password"}, status_code=401)
+    if result.get("error") == "pending":
+        return JSONResponse({"error": "Your access request is pending approval", "status": "pending"}, status_code=403)
+    if result.get("error") == "disabled":
+        return JSONResponse({"error": "Your account has been disabled", "status": "disabled"}, status_code=403)
+    # Create a chat_user token
+    token = _create_token("chat_user", tenant_id, email=email)
+    return {"token": token, "email": email, "name": result.get("display_name", ""), "tenant_id": tenant_id}
+
+@app.post("/api/t/{tenant_id}/chat-auth/register")
+async def chat_user_register(tenant_id: str, request: Request):
+    """Request chat access — creates pending user."""
+    body = await request.json()
+    email = body.get("email", "").strip().lower()
+    password = body.get("password", "")
+    display_name = body.get("name", "")
+    reason = body.get("reason", "")
+    if not email or not password:
+        return JSONResponse({"error": "Email and password required"}, status_code=400)
+    from backend.core import database as db
+    existing = db.get_chat_user(tenant_id, email)
+    if existing:
+        if existing["status"] == "pending":
+            return JSONResponse({"error": "Access request already submitted", "status": "pending"}, status_code=409)
+        if existing["status"] == "active":
+            return JSONResponse({"error": "Account already exists. Please login.", "status": "active"}, status_code=409)
+    db.create_chat_user(tenant_id, email, password, display_name, status="pending", created_by="self", reason=reason)
+    return {"status": "pending", "message": "Access request submitted. Awaiting admin approval."}
+
+@app.get("/api/t/{tenant_id}/chat-auth/check")
+async def chat_auth_check(tenant_id: str, request: Request):
+    """Check if chat login is required + validate existing token."""
+    from backend.core import database as db
+    tenant = db.get_tenant(tenant_id)
+    _lr = tenant.get("chat_login_required", False) if tenant else False
+    login_required = _lr is True or _lr == "true" or _lr == "TRUE"
+    # Check for existing token
+    auth_header = request.headers.get("Authorization", "")
+    token = auth_header.replace("Bearer ", "").strip() if auth_header.startswith("Bearer ") else ""
+    authenticated = False
+    user_email = ""
+    if token:
+        info = _validate_token(token)
+        if info and info.get("tenant_id") == tenant_id:
+            authenticated = True
+            user_email = info.get("email", "")
+    return {"login_required": login_required, "authenticated": authenticated, "email": user_email}
+
 @app.get("/c/{embed_token}")
 async def public_chat_by_token(embed_token: str):
     """Public chat via secret token URL — /c/a8f3k9x2m7b4..."""
@@ -444,9 +505,11 @@ async def _serve_tenant_embed(tenant: dict):
     if not embed_path.exists():
         return JSONResponse({"error": "Embed page not found"}, status_code=404)
     html = embed_path.read_text(encoding="utf-8")
+    _clr = tenant.get("chat_login_required", False)
+    chat_login_required = _clr is True or _clr == "true" or _clr == "TRUE"
     html = html.replace(
         "const base = (typeof api !== 'undefined' ? api : null) || window.location.origin;",
-        f"const base = (typeof api !== 'undefined' ? api : null) || window.location.origin;\n    const TENANT_ID = {json.dumps(tenant_id)};"
+        f"const base = (typeof api !== 'undefined' ? api : null) || window.location.origin;\n    const TENANT_ID = {json.dumps(tenant_id)};\n    const chatLoginRequired = {json.dumps(chat_login_required)};"
     )
     html = html.replace("'/api/chat'", f"'/api/t/{tenant_id}/chat'")
     html = html.replace("'/api/admin/agent-config'", f"'/api/super/tenants/{tenant_id}'")

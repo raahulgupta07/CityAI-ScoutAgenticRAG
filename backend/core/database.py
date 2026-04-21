@@ -421,10 +421,27 @@ def _ensure_monitoring_tables(conn):
             created_at TIMESTAMPTZ DEFAULT NOW()
         )
     """)
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS chat_users (
+            id SERIAL PRIMARY KEY,
+            tenant_id TEXT NOT NULL,
+            email TEXT NOT NULL,
+            display_name TEXT DEFAULT '',
+            pass_hash TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'pending',
+            reason TEXT DEFAULT '',
+            created_by TEXT DEFAULT 'self',
+            created_at TIMESTAMPTZ DEFAULT NOW(),
+            approved_at TIMESTAMPTZ,
+            last_login_at TIMESTAMPTZ,
+            UNIQUE(tenant_id, email)
+        )
+    """)
     try:
         conn.execute("CREATE INDEX IF NOT EXISTS idx_usage_tenant ON usage_log (tenant_id, created_at DESC)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_audit_tenant ON audit_log (tenant_id, created_at DESC)")
         conn.execute("CREATE INDEX IF NOT EXISTS idx_alerts_unread ON alerts (is_read, created_at DESC)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_chat_users_tenant ON chat_users (tenant_id, status)")
     except Exception:
         pass
     conn.commit()
@@ -711,6 +728,7 @@ def init_db():
             ("agent_system_prompt", "''"), ("sop_template", "'auto'"),
             ("embed_enabled", "FALSE"),
             ("escalation_config", "'{}'"),
+            ("chat_login_required", "FALSE"),
         ]:
             try:
                 conn.execute(f"ALTER TABLE tenants ADD COLUMN IF NOT EXISTS {col} TEXT DEFAULT {default}")
@@ -1722,6 +1740,118 @@ def migrate_from_catalog(catalog_path: Path) -> int:
                     img.get("path", ""), img.get("width", 0), img.get("height", 0))
         count += 1
     return count
+
+
+# ── Chat User Management ─────────────────────────────────────────────────────
+
+def create_chat_user(tenant_id: str, email: str, password: str, display_name: str = "",
+                     status: str = "active", created_by: str = "admin", reason: str = "") -> dict:
+    """Create a chat user. status='active' for admin-created, 'pending' for self-registered."""
+    conn = get_db()
+    try:
+        pass_hash = _hash_password(password)
+        conn.execute(
+            """INSERT INTO chat_users (tenant_id, email, display_name, pass_hash, status, created_by, reason, approved_at)
+               VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+               ON CONFLICT (tenant_id, email) DO UPDATE SET pass_hash = EXCLUDED.pass_hash, status = EXCLUDED.status""",
+            (tenant_id, email.lower().strip(), display_name, pass_hash, status, created_by, reason,
+             "NOW()" if status == "active" else None)
+        )
+        conn.commit()
+        return {"email": email, "status": status}
+    finally:
+        conn.close()
+
+
+def get_chat_user(tenant_id: str, email: str) -> dict | None:
+    """Look up a chat user by tenant + email."""
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT * FROM chat_users WHERE tenant_id = %s AND email = %s",
+            (tenant_id, email.lower().strip())
+        ).fetchone()
+        return dict(row) if row else None
+    finally:
+        conn.close()
+
+
+def list_chat_users(tenant_id: str, status: str = None) -> list:
+    """List chat users for a tenant, optionally filtered by status."""
+    conn = get_db()
+    try:
+        if status:
+            rows = conn.execute(
+                "SELECT * FROM chat_users WHERE tenant_id = %s AND status = %s ORDER BY created_at DESC",
+                (tenant_id, status)
+            ).fetchall()
+        else:
+            rows = conn.execute(
+                "SELECT * FROM chat_users WHERE tenant_id = %s ORDER BY created_at DESC",
+                (tenant_id,)
+            ).fetchall()
+        return [dict(r) for r in rows]
+    finally:
+        conn.close()
+
+
+def count_pending_chat_users(tenant_id: str) -> int:
+    """Count pending access requests for a tenant."""
+    conn = get_db()
+    try:
+        row = conn.execute(
+            "SELECT COUNT(*) AS cnt FROM chat_users WHERE tenant_id = %s AND status = 'pending'",
+            (tenant_id,)
+        ).fetchone()
+        return row["cnt"] if row else 0
+    finally:
+        conn.close()
+
+
+def update_chat_user_status(user_id: int, status: str) -> bool:
+    """Update chat user status (approve/reject/disable)."""
+    conn = get_db()
+    try:
+        extra = ", approved_at = NOW()" if status == "active" else ""
+        conn.execute(f"UPDATE chat_users SET status = %s{extra} WHERE id = %s", (status, user_id))
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+def delete_chat_user(user_id: int) -> bool:
+    """Delete a chat user."""
+    conn = get_db()
+    try:
+        conn.execute("DELETE FROM chat_users WHERE id = %s", (user_id,))
+        conn.commit()
+        return True
+    finally:
+        conn.close()
+
+
+def update_chat_user_last_login(user_id: int):
+    """Update last login timestamp."""
+    conn = get_db()
+    try:
+        conn.execute("UPDATE chat_users SET last_login_at = NOW() WHERE id = %s", (user_id,))
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def verify_chat_user(tenant_id: str, email: str, password: str) -> dict | None:
+    """Verify chat user credentials. Returns user dict if valid, None if not."""
+    user = get_chat_user(tenant_id, email)
+    if not user:
+        return None
+    if user.get("status") != "active":
+        return {"error": "pending" if user["status"] == "pending" else "disabled", "status": user["status"]}
+    if not _verify_password(password, user.get("pass_hash", "")):
+        return None
+    update_chat_user_last_login(user["id"])
+    return user
 
 
 # Initialize on import

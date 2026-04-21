@@ -21,14 +21,16 @@ open http://localhost:8080
 2. **Tenant admin** uploads documents at `/t/{id}/admin`
 3. Click **TRAIN** → 11-step pipeline: categorize → vision extract → screenshots → enhance → knowledge (30-50 Q&A) → embed → compliance → auto-train → self-learn → wiki
 4. Click **STANDARDIZE** (optional) → AI generates consulting-grade DOCX + auto-embeds for chat search
-5. **Users chat** at `/c/{token}` — agent answers from documents only, with inline citations and screenshots
-6. **Agent self-learns** — saves successful routes, learns from feedback, gets faster with every query
+5. Set **Chat Access** in Config tab → PUBLIC (open) or PRIVATE (login required)
+6. **Users chat** at `/c/{token}` — public: direct chat, private: login first
+7. **Manage users** in Users tab → create directly or approve self-registration requests
+8. **Agent self-learns** — saves successful routes, learns from feedback, gets faster with every query
 
 ## Architecture
 
 ```
 Super Admin (SvelteKit)     Tenant Admin (HTML)        Public Chat
-/  /monitoring  /system     /t/{id}/admin (6 tabs)     /c/{token}
+/  /monitoring  /system     /t/{id}/admin (7 tabs)     /c/{token}
         │                           │                      │
         └───────────────────────────┼──────────────────────┘
                                     ▼
@@ -110,6 +112,9 @@ Both raw (pages 1-N) and standardized (pages 900+) content are searchable in cha
 - **Scheduled Re-Training** — daily/weekly/monthly auto-retrain
 - **Deep Health Check** — DB, disk, memory, OpenRouter, uptime
 - **Structured JSON Logging** — tenant_id + request_id per log
+- **Chat Access Mode** — toggle PUBLIC (open) / PRIVATE (login required) per tenant in Config tab
+- **Chat User Management** — Users tab: admin creates users directly or approves self-registration requests
+- **Self-Registration** — users can "Request Access" from chat login page, admin approves/rejects
 - **Connection Pooling** — psycopg_pool (min=2, max=10)
 
 ## 6-Layer Learning System
@@ -196,6 +201,9 @@ curl http://localhost:8080/api/health  # Health check
 4. **Standardize** — click STANDARDIZE, watch terminal, download DOCX
 5. **Chat** — starter cards, ask question, see citations + screenshots + side-by-side PDF
 6. **Public Chat** — open embed URL, same features work
+7. **Config** — toggle PUBLIC/PRIVATE mode, see status update
+8. **Users** — create users, approve/reject access requests, disable/delete
+9. **Private Chat** — set PRIVATE → open `/c/{token}` → see login form → request access → approve → login works
 7. **Bulk Ops** — Train All, pin docs, bulk delete, tag filter
 8. **Analytics** — Logs tab shows charts + top queries
 9. **Health** — `/api/health` returns healthy

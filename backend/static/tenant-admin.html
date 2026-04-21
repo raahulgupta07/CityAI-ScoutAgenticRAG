@@ -152,10 +152,11 @@ input:focus,textarea:focus{outline:none;border-color:#007518;box-shadow:0 0 0 2p
         <button onclick="switchTab('logs',this)" style="width:100%;text-align:left;padding:12px 16px;border:none;background:transparent;color:#ebe8dd;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:12px;font-family:inherit;transition:all 0.15s"><span class="material-symbols-outlined" style="font-size:20px">history_edu</span> Logs</button>
         <button onclick="switchTab('config',this)" style="width:100%;text-align:left;padding:12px 16px;border:none;background:transparent;color:#ebe8dd;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:12px;font-family:inherit;transition:all 0.15s"><span class="material-symbols-outlined" style="font-size:20px">settings</span> Config</button>
         <button onclick="switchTab('embed',this)" style="width:100%;text-align:left;padding:12px 16px;border:none;background:transparent;color:#ebe8dd;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:12px;font-family:inherit;transition:all 0.15s"><span class="material-symbols-outlined" style="font-size:20px">code</span> Embed</button>
+        <button onclick="switchTab('users',this)" style="width:100%;text-align:left;padding:12px 16px;border:none;background:transparent;color:#ebe8dd;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:12px;font-family:inherit;transition:all 0.15s"><span class="material-symbols-outlined" style="font-size:20px">group</span> Users<span id="pending-badge" style="display:none;background:#be2d06;color:white;padding:1px 6px;font-size:9px;font-weight:900;margin-left:auto">0</span></button>
     </nav>
     <div style="margin-top:auto;padding-top:24px;border-top:2px solid rgba(254,255,214,0.15)">
         <a id="public-link" href="#" target="_blank" style="display:flex;align-items:center;gap:12px;padding:10px 16px;color:#ebe8dd;text-decoration:none;font-size:13px;transition:all 0.15s" onmouseover="this.style.background='rgba(254,255,214,0.1)';this.style.color='#feffd6'" onmouseout="this.style.background='transparent';this.style.color='#ebe8dd'">
-            <span class="material-symbols-outlined" style="font-size:20px">open_in_new</span> Public Chat
+            <span class="material-symbols-outlined" style="font-size:20px">link</span> Chat URL
         </a>
         <button onclick="doLogout()" style="width:100%;text-align:left;padding:10px 16px;border:none;background:transparent;color:#ebe8dd;font-size:13px;cursor:pointer;display:flex;align-items:center;gap:12px;font-family:inherit;transition:all 0.15s" onmouseover="this.style.background='rgba(254,255,214,0.1)';this.style.color='#feffd6'" onmouseout="this.style.background='transparent';this.style.color='#ebe8dd'">
             <span class="material-symbols-outlined" style="font-size:20px">logout</span> Logout
@@ -173,7 +174,7 @@ input:focus,textarea:focus{outline:none;border-color:#007518;box-shadow:0 0 0 2p
     </div>
 </aside>
 
-<main style="flex:1;overflow-y:auto;background:#feffd6;padding-bottom:140px">
+<main style="flex:1;overflow-y:auto;background:#feffd6;padding:24px 24px 140px 24px">
 <!-- Top bar -->
 <header style="position:sticky;top:0;z-index:40;height:64px;display:flex;align-items:center;justify-content:space-between;padding:0 32px;background:#383832;border-bottom:3px solid #383832">
     <div style="display:flex;align-items:center;gap:16px">
@@ -792,6 +793,19 @@ input:focus,textarea:focus{outline:none;border-color:#007518;box-shadow:0 0 0 2p
             </div>
         </div>
 
+        <!-- Row 0: Chat Access Mode Toggle -->
+        <div style="display:flex;align-items:center;justify-content:space-between;padding:16px;border-bottom:2px solid #383832;background:#f6f4e9">
+            <div style="display:flex;align-items:center;gap:16px">
+                <div style="display:inline-block;padding:2px 8px;font-size:9px;font-weight:900;text-transform:uppercase;background:#383832;color:#feffd6">CHAT ACCESS</div>
+                <span id="mode-label-public" style="font-size:12px;font-weight:700;color:#65655e">🌐 PUBLIC</span>
+                <div id="mode-toggle" onclick="toggleAgentMode()" style="width:52px;height:28px;background:#ebe8dd;border:2px solid #383832;cursor:pointer;position:relative;transition:background 0.3s">
+                    <div id="mode-toggle-knob" style="width:22px;height:22px;background:#383832;position:absolute;top:1px;left:1px;transition:left 0.3s"></div>
+                </div>
+                <span id="mode-label-private" style="font-size:12px;font-weight:700;color:#383832">🔒 PRIVATE</span>
+            </div>
+            <div id="mode-status" style="font-size:11px;color:#65655e"></div>
+        </div>
+
         <!-- Row 1: Agent Name + Role -->
         <div style="display:flex;border-bottom:2px solid #383832">
             <div style="flex:1;padding:16px;border-right:2px solid #383832">
@@ -974,12 +988,7 @@ Example auto-generated persona:
         <div style="display:flex;align-items:center;gap:12px">
             <span class="material-symbols-outlined" style="color:#ff9d00;font-size:20px">code</span>
             <span style="font-size:14px;font-weight:900;text-transform:uppercase;color:#feffd6;letter-spacing:0.05em">EMBED & DEPLOY</span>
-            <div id="embed-badge" style="padding:2px 8px;background:#007518;display:flex;align-items:center;gap:6px">
-                <span id="embed-badge-dot" style="width:5px;height:5px;background:white"></span>
-                <span id="embed-badge-text" style="font-size:9px;font-weight:900;text-transform:uppercase;color:white">Disabled</span>
-            </div>
         </div>
-        <button id="embed-toggle-btn" onclick="toggleEmbedEnabled()" style="padding:6px 16px;border:2px solid #feffd6;background:transparent;color:#feffd6;font-size:10px;font-weight:900;text-transform:uppercase;cursor:pointer;font-family:'Space Grotesk',sans-serif;letter-spacing:0.05em;transition:all 0.15s" onmouseover="this.style.background='#be2d06';this.style.borderColor='#be2d06'" onmouseout="this.style.background='transparent';this.style.borderColor='#feffd6'">Enable Public Chat</button>
     </div>
 
     <!-- Split Screen: Left=Code, Right=Preview -->
@@ -989,7 +998,7 @@ Example auto-generated persona:
         <div style="width:40%;flex-shrink:0;overflow-y:auto;background:white;border-right:3px solid #383832">
             <!-- Public URL -->
             <div style="padding:16px;border-bottom:2px solid #383832">
-                <div style="display:inline-block;padding:2px 8px;font-size:9px;font-weight:900;text-transform:uppercase;background:#383832;color:#feffd6;margin-bottom:8px">PUBLIC CHAT URL</div>
+                <div style="display:inline-block;padding:2px 8px;font-size:9px;font-weight:900;text-transform:uppercase;background:#383832;color:#feffd6;margin-bottom:8px">CHAT URL</div>
                 <div style="display:flex;align-items:center;gap:4px;background:#1a1a1a;border:2px solid #383832;padding:2px">
                     <code id="embed-url-box" style="flex:1;padding:6px 10px;font-family:monospace;font-size:11px;color:#00fc40;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></code>
                     <button onclick="navigator.clipboard.writeText(document.getElementById('embed-url-box').textContent);this.textContent='OK';setTimeout(()=>this.textContent='COPY',1500)" style="padding:4px 10px;background:#00fc40;border:none;color:#383832;font-size:9px;font-weight:900;cursor:pointer;font-family:'Space Grotesk',sans-serif;text-transform:uppercase">COPY</button>
@@ -1055,6 +1064,71 @@ Example auto-generated persona:
     </div>
 </div>
 </div>
+
+<!-- Users Tab -->
+<div id="tab-users" class="tab-content">
+    <!-- Public mode message -->
+    <div id="users-public-msg" style="display:none;background:#ffffff;border-top:2px solid #383832;border-left:2px solid #383832;border-bottom:4px solid #383832;border-right:4px solid #383832;box-shadow:4px 4px 0px 0px #383832;padding:60px 32px;text-align:center;margin-bottom:32px">
+        <span class="material-symbols-outlined" style="font-size:48px;color:#007518;margin-bottom:16px;display:block">public</span>
+        <h2 style="font-size:20px;font-weight:900;text-transform:uppercase;color:#383832;margin:0 0 8px 0;font-family:'Space Grotesk',sans-serif">Public Mode</h2>
+        <p style="font-size:13px;color:#65655e;max-width:400px;margin:0 auto 24px auto;line-height:1.6">Chat is open to everyone. No login required. Switch to Private mode in Config tab to manage users.</p>
+        <button onclick="switchTab('config',document.querySelectorAll('aside nav button')[4])" style="padding:10px 24px;background:#00fc40;border:2px solid #383832;color:#383832;font-size:11px;font-weight:900;text-transform:uppercase;cursor:pointer;font-family:'Space Grotesk',sans-serif;box-shadow:4px 4px 0 #383832">Go to Config</button>
+    </div>
+
+    <!-- Private mode content -->
+    <div id="users-private-content" style="display:block">
+    <div style="background:#ffffff;border:2px solid #383832;box-shadow:4px 4px 0px 0px #383832;overflow:hidden;margin-bottom:32px">
+        <div style="padding:16px 24px;display:flex;justify-content:space-between;align-items:center;border-bottom:2px solid #383832;background:#f6f4e9">
+            <div style="display:flex;align-items:center;gap:16px">
+                <span style="font-family:'Space Grotesk',sans-serif;font-weight:900;font-size:16px;color:#383832;text-transform:uppercase">🔒 Chat Users</span>
+                <div style="display:flex;background:#ebe8dd;padding:4px;border:2px solid #383832">
+                    <button onclick="userFilter='all';loadChatUsers()" id="user-filter-all" style="padding:6px 12px;background:#383832;border:none;color:#feffd6;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;text-transform:uppercase">All</button>
+                    <button onclick="userFilter='pending';loadChatUsers()" id="user-filter-pending" style="padding:6px 12px;background:transparent;border:none;color:#65655e;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;text-transform:uppercase">Pending</button>
+                    <button onclick="userFilter='active';loadChatUsers()" id="user-filter-active" style="padding:6px 12px;background:transparent;border:none;color:#65655e;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;text-transform:uppercase">Active</button>
+                    <button onclick="userFilter='disabled';loadChatUsers()" id="user-filter-disabled" style="padding:6px 12px;background:transparent;border:none;color:#65655e;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;text-transform:uppercase">Disabled</button>
+                </div>
+            </div>
+            <button onclick="showAddUserForm()" style="padding:6px 14px;background:#00fc40;border:2px solid #383832;color:#383832;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;display:flex;align-items:center;gap:4px;text-transform:uppercase;box-shadow:2px 2px 0 #383832"><span class="material-symbols-outlined" style="font-size:14px">person_add</span>Add User</button>
+        </div>
+        <!-- Add User Form (hidden by default) -->
+        <div id="add-user-form" style="display:none;padding:24px 32px;border-bottom:2px solid #383832;background:#f6f4e9">
+            <div style="display:flex;gap:16px;align-items:end">
+                <div style="flex:1">
+                    <label style="font-size:10px;font-weight:900;text-transform:uppercase;color:#65655e;display:block;margin-bottom:4px">Email</label>
+                    <input id="new-user-email" type="email" placeholder="user@company.com" style="width:100%;padding:8px 12px;border:2px solid #383832;font-size:12px;font-family:inherit;outline:none">
+                </div>
+                <div style="flex:1">
+                    <label style="font-size:10px;font-weight:900;text-transform:uppercase;color:#65655e;display:block;margin-bottom:4px">Name</label>
+                    <input id="new-user-name" type="text" placeholder="John Smith" style="width:100%;padding:8px 12px;border:2px solid #383832;font-size:12px;font-family:inherit;outline:none">
+                </div>
+                <div style="flex:1">
+                    <label style="font-size:10px;font-weight:900;text-transform:uppercase;color:#65655e;display:block;margin-bottom:4px">Password</label>
+                    <input id="new-user-pass" type="password" placeholder="••••••••" style="width:100%;padding:8px 12px;border:2px solid #383832;font-size:12px;font-family:inherit;outline:none">
+                </div>
+                <button onclick="createChatUser()" style="padding:8px 20px;background:#00fc40;border:2px solid #383832;color:#383832;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;text-transform:uppercase;box-shadow:2px 2px 0 #383832;white-space:nowrap">Create</button>
+                <button onclick="document.getElementById('add-user-form').style.display='none'" style="padding:8px 12px;background:transparent;border:2px solid #383832;color:#383832;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;text-transform:uppercase">Cancel</button>
+            </div>
+        </div>
+        <!-- User Table -->
+        <table style="width:100%;border-collapse:collapse">
+            <thead>
+                <tr style="background:#f6f4e9;border-bottom:2px solid #383832">
+                    <th style="padding:16px 32px;text-align:left;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.1em;color:#65655e">Email</th>
+                    <th style="padding:16px 32px;text-align:left;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.1em;color:#65655e">Name</th>
+                    <th style="padding:16px 32px;text-align:left;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.1em;color:#65655e">Status</th>
+                    <th style="padding:16px 32px;text-align:left;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.1em;color:#65655e">Created</th>
+                    <th style="padding:16px 32px;text-align:left;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.1em;color:#65655e">Last Login</th>
+                    <th style="padding:16px 32px;text-align:center;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.1em;color:#65655e">Actions</th>
+                </tr>
+            </thead>
+            <tbody id="chat-users-list">
+                <tr><td colspan="6" style="padding:40px;color:#65655e;font-size:13px;text-align:center">No chat users yet. Add users or enable login-required chat.</td></tr>
+            </tbody>
+        </table>
+    </div>
+    </div><!-- /users-private-content -->
+</div>
+
 </div>
 <!-- Persistent Pipeline Terminal — visible across all tabs -->
 <div id="pipeline-bar" style="position:fixed;bottom:0;left:0;right:0;z-index:200;background:#1a1a1a;border-top:2px solid #383832;display:none">
@@ -1088,7 +1162,7 @@ let TENANT = {};
 
 function headers() { return TOKEN ? {'Authorization': `Bearer ${TOKEN}`} : {}; }
 function esc(s) { if (!s) return ''; const d = document.createElement('div'); d.textContent = String(s); return d.innerHTML; }
-const tabTitles = {dashboard:'Tenant Overview',documents:'Document Manager',chat:'Agent Chat',logs:'Query Audit Log',config:'Agent Configuration',embed:'Embed & Deploy'};
+const tabTitles = {dashboard:'Tenant Overview',documents:'Document Manager',chat:'Agent Chat',logs:'Query Audit Log',config:'Agent Configuration',embed:'Embed & Deploy',users:'Chat User Management'};
 function switchTab(name, btn) {
     document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
     document.getElementById('tab-' + name).classList.add('active');
@@ -1101,6 +1175,7 @@ function switchTab(name, btn) {
     if (name === 'logs') loadLogs();
     if (name === 'chat') { initAdminChat(); }
     if (name === 'config') loadSchedule();
+    if (name === 'users') loadChatUsers();
 }
 
 if (TOKEN) showAdmin();
@@ -1237,6 +1312,8 @@ async function showAdmin() {
     } catch {}
     await loadStats();
     await loadDocs();
+    loadPendingBadge();
+    loadAgentMode();
     // Always show pipeline bar + resume if training is running
     document.getElementById('pipeline-bar').style.display = 'block';
     checkRunningTraining();
@@ -2813,6 +2890,161 @@ async function saveConfig() {
         if(typeof ChatWidget !== 'undefined') ChatWidget.setAgentName(body.agent_name);
     } catch(e) { msgEl.textContent = e.message; msgEl.style.color='#be2d06'; }
 }
+
+// ── Chat Users Management ──
+let userFilter = 'all';
+
+function showAddUserForm() {
+    document.getElementById('add-user-form').style.display = 'block';
+    document.getElementById('new-user-email').focus();
+}
+
+async function createChatUser() {
+    const email = document.getElementById('new-user-email').value.trim();
+    const name = document.getElementById('new-user-name').value.trim();
+    const password = document.getElementById('new-user-pass').value;
+    if (!email || !password) { alert('Email and password required'); return; }
+    try {
+        const res = await fetch(`${API}/chat-users`, {method:'POST', headers:{'Content-Type':'application/json', ...headers()}, body: JSON.stringify({email, display_name: name, password})});
+        const data = await res.json();
+        if (data.error) { alert(data.error); return; }
+        document.getElementById('add-user-form').style.display = 'none';
+        document.getElementById('new-user-email').value = '';
+        document.getElementById('new-user-name').value = '';
+        document.getElementById('new-user-pass').value = '';
+        loadChatUsers();
+    } catch(e) { alert('Failed: ' + e.message); }
+}
+
+async function loadChatUsers() {
+    const url = userFilter === 'all' ? `${API}/chat-users` : `${API}/chat-users?status=${userFilter}`;
+    try {
+        const users = await (await fetch(url, {headers:headers()})).json();
+        // Update filter buttons
+        ['all','pending','active','disabled'].forEach(f => {
+            const btn = document.getElementById('user-filter-'+f);
+            if(btn) { btn.style.background = f===userFilter?'#383832':'transparent'; btn.style.color = f===userFilter?'#feffd6':'#65655e'; }
+        });
+        // Sync mode UI
+        await loadAgentMode();
+        const tbody = document.getElementById('chat-users-list');
+        if (!users.length) {
+            tbody.innerHTML = '<tr><td colspan="6" style="padding:40px;color:#65655e;font-size:13px;text-align:center">No ' + (userFilter==='all'?'':userFilter+' ') + 'users found.</td></tr>';
+            return;
+        }
+        tbody.innerHTML = users.map(u => {
+            const statusColors = {active:'#007518', pending:'#ff9d00', rejected:'#be2d06', disabled:'#65655e'};
+            const statusBg = {active:'#e8f5e9', pending:'#fff3e0', rejected:'#fce4ec', disabled:'#ebe8dd'};
+            const statusHtml = `<span style="padding:4px 10px;background:${statusBg[u.status]||'#ebe8dd'};color:${statusColors[u.status]||'#65655e'};font-size:10px;font-weight:900;text-transform:uppercase">${u.status}</span>`;
+            let actions = '';
+            if (u.status === 'pending') {
+                actions = `<button onclick="approveChatUser(${u.id})" style="padding:4px 10px;background:#007518;border:none;color:white;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;text-transform:uppercase;margin-right:4px">Approve</button><button onclick="rejectChatUser(${u.id})" style="padding:4px 10px;background:#be2d06;border:none;color:white;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;text-transform:uppercase">Reject</button>`;
+            } else if (u.status === 'active') {
+                actions = `<button onclick="disableChatUser(${u.id})" style="padding:4px 10px;background:transparent;border:1px solid #65655e;color:#65655e;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;text-transform:uppercase">Disable</button>`;
+            } else {
+                actions = `<button onclick="approveChatUser(${u.id})" style="padding:4px 10px;background:transparent;border:1px solid #007518;color:#007518;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;text-transform:uppercase">Enable</button>`;
+            }
+            actions += ` <button onclick="deleteChatUser(${u.id})" style="padding:4px 10px;background:transparent;border:1px solid #be2d06;color:#be2d06;font-size:10px;font-weight:900;cursor:pointer;font-family:inherit;text-transform:uppercase;margin-left:4px">Delete</button>`;
+            const created = u.created_at ? u.created_at.split('T')[0] : '—';
+            const lastLogin = u.last_login_at ? u.last_login_at.split('T')[0] : '—';
+            const reasonHtml = u.reason ? `<div style="font-size:10px;color:#65655e;margin-top:2px">"${esc(u.reason)}"</div>` : '';
+            return `<tr style="border-bottom:1px solid rgba(56,56,50,0.1)" onmouseover="this.style.background='#fcf9ef'" onmouseout="this.style.background='white'">
+                <td style="padding:16px 32px"><span style="font-size:13px;font-weight:600;color:#383832">${esc(u.email)}</span>${reasonHtml}</td>
+                <td style="padding:16px 32px;font-size:12px;color:#383832">${esc(u.display_name||'—')}</td>
+                <td style="padding:16px 32px">${statusHtml}</td>
+                <td style="padding:16px 32px;font-size:11px;color:#65655e">${created}<br><span style="font-size:9px;color:#8f909a">${u.created_by==='admin'?'by admin':'self-registered'}</span></td>
+                <td style="padding:16px 32px;font-size:11px;color:#65655e">${lastLogin}</td>
+                <td style="padding:16px 32px;text-align:center">${actions}</td>
+            </tr>`;
+        }).join('');
+        // Update pending badge
+        loadPendingBadge();
+    } catch(e) { console.error('Failed to load users:', e); }
+}
+
+async function approveChatUser(id) {
+    await fetch(`${API}/chat-users/${id}/approve`, {method:'PUT', headers:headers()});
+    loadChatUsers();
+}
+async function rejectChatUser(id) {
+    await fetch(`${API}/chat-users/${id}/reject`, {method:'PUT', headers:headers()});
+    loadChatUsers();
+}
+async function disableChatUser(id) {
+    await fetch(`${API}/chat-users/${id}/disable`, {method:'PUT', headers:headers()});
+    loadChatUsers();
+}
+async function deleteChatUser(id) {
+    if (!confirm('Delete this user permanently?')) return;
+    await fetch(`${API}/chat-users/${id}`, {method:'DELETE', headers:headers()});
+    loadChatUsers();
+}
+
+let _agentModePrivate = false;
+
+async function toggleAgentMode() {
+    _agentModePrivate = !_agentModePrivate;
+    _updateModeUI();
+    await fetch(`${API}/chat-login-required`, {method:'PUT', headers:{'Content-Type':'application/json', ...headers()}, body: JSON.stringify({required: _agentModePrivate})});
+}
+
+function _updateModeUI() {
+    const knob = document.getElementById('mode-toggle-knob');
+    const toggle = document.getElementById('mode-toggle');
+    const labelPub = document.getElementById('mode-label-public');
+    const labelPri = document.getElementById('mode-label-private');
+    const status = document.getElementById('mode-status');
+    if (_agentModePrivate) {
+        knob.style.left = '27px';
+        toggle.style.background = '#007518';
+        labelPub.style.color = '#65655e';
+        labelPri.style.color = '#007518';
+        labelPri.style.fontWeight = '900';
+        labelPub.style.fontWeight = '700';
+        if (status) status.innerHTML = '🔒 Login required — manage users in <a href="#" onclick="event.preventDefault();switchTab(\'users\',document.querySelectorAll(\'aside nav button\')[6])" style="color:#007518;font-weight:900">Users tab</a>';
+    } else {
+        knob.style.left = '1px';
+        toggle.style.background = '#ebe8dd';
+        labelPub.style.color = '#007518';
+        labelPri.style.color = '#65655e';
+        labelPub.style.fontWeight = '900';
+        labelPri.style.fontWeight = '700';
+        if (status) status.textContent = '🌐 Anyone with the link can chat';
+    }
+    // Update Users tab display
+    const usersPublicMsg = document.getElementById('users-public-msg');
+    const usersPrivateContent = document.getElementById('users-private-content');
+    if (usersPublicMsg) usersPublicMsg.style.display = _agentModePrivate ? 'none' : 'block';
+    if (usersPrivateContent) usersPrivateContent.style.display = _agentModePrivate ? 'block' : 'none';
+}
+
+async function loadAgentMode() {
+    try {
+        const data = await (await fetch(`${API}/chat-login-required`, {headers:headers()})).json();
+        _agentModePrivate = data.required === true || data.required === 'true';
+        _updateModeUI();
+    } catch {}
+}
+
+async function toggleChatLoginRequired(required) {
+    _agentModePrivate = required;
+    _updateModeUI();
+    await fetch(`${API}/chat-login-required`, {method:'PUT', headers:{'Content-Type':'application/json', ...headers()}, body: JSON.stringify({required})});
+}
+
+async function loadPendingBadge() {
+    try {
+        const data = await (await fetch(`${API}/chat-users/pending-count`, {headers:headers()})).json();
+        const badge = document.getElementById('pending-badge');
+        if (badge) {
+            badge.textContent = data.count || 0;
+            badge.style.display = data.count > 0 ? 'inline' : 'none';
+        }
+    } catch {}
+}
+
+// Poll pending badge every 30s
+setInterval(loadPendingBadge, 30000);
 </script>
 <script src="/static/chat-widget.js"></script>
 </body>

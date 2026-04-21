@@ -190,7 +190,26 @@ CREATE TABLE IF NOT EXISTS eval_runs (
     run_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- ============================================================================
+-- Chat Users (public schema — for login-required chat access)
+-- ============================================================================
+CREATE TABLE IF NOT EXISTS chat_users (
+    id SERIAL PRIMARY KEY,
+    tenant_id TEXT NOT NULL,
+    email TEXT NOT NULL,
+    display_name TEXT DEFAULT '',
+    pass_hash TEXT NOT NULL DEFAULT '',
+    status TEXT NOT NULL DEFAULT 'pending',
+    reason TEXT DEFAULT '',
+    created_by TEXT DEFAULT 'self',
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    approved_at TIMESTAMPTZ,
+    last_login_at TIMESTAMPTZ,
+    UNIQUE(tenant_id, email)
+);
+
 -- Indexes
 CREATE INDEX IF NOT EXISTS idx_sops_search ON sops USING GIN (to_tsvector('english', search_text));
 CREATE INDEX IF NOT EXISTS idx_embeddings_vector ON embeddings USING hnsw (embedding vector_cosine_ops);
 CREATE INDEX IF NOT EXISTS idx_intent_keywords ON intent_routes USING GIN (keywords);
+CREATE INDEX IF NOT EXISTS idx_chat_users_tenant ON chat_users (tenant_id, status);

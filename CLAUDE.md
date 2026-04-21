@@ -6,7 +6,7 @@ Multi-tenant document intelligence platform with AI-powered chat. Each tenant ge
 ## Tech Stack
 - **Backend:** FastAPI + Agno agent framework (Python 3.11)
 - **Super Admin:** SvelteKit + Tailwind CSS
-- **Tenant Admin:** Standalone HTML (Brutalist design, 6-tab panel)
+- **Tenant Admin:** Standalone HTML (Brutalist design, 7-tab panel: Dashboard, Documents, Chat, Logs, Config, Embed, Users)
 - **Chat Widget:** Shared `chat-widget.js` — single source for admin + public chat (side-by-side PDF viewer)
 - **Agent:** Agno with 12 tools + self-learning + feedback learning + visual PDF reading
 - **Database:** PostgreSQL 18 + PgVector (schema-per-tenant) + connection pool (psycopg_pool)
@@ -155,6 +155,25 @@ Shared `chat-widget.js` powers both admin and public chat:
 - localStorage persistence (1hr TTL)
 - Mobile responsive
 
+## Chat Access Mode (Config tab toggle)
+Two modes controlled by a toggle switch in Config tab:
+- **🌐 PUBLIC** — anyone with the chat link can chat, no login needed
+- **🔒 PRIVATE** — users must login, admin approves access requests
+
+Toggle updates `tenants.chat_login_required` column (stored as TEXT, normalized to boolean in API).
+
+## Chat User Management (Users tab)
+- **PRIVATE mode**: Users tab shows user table with approve/reject/disable/delete
+- **PUBLIC mode**: Users tab shows "Chat is open" message with link to Config
+- **Admin creates users directly** → status=active (instant access)
+- **Users self-register** via "Request Access" → status=pending → admin approves/rejects
+- Pending badge on sidebar shows count of access requests (polled every 30s)
+- `chat_users` table in public schema (tenant_id, email, pass_hash, status, reason)
+- Chat user tokens reuse existing `auth_tokens` table with type=`chat_user`
+- Auth header attached to SSE chat + feedback calls when login required
+- 401 response auto-shows login form (token expired/invalid)
+- Chat widget shows login/register form when `chatLoginRequired=true` (injected via embed HTML)
+
 ## Document Library Features
 - **Pin/Star** — pinned docs sort to top (persisted in DB)
 - **Bulk Delete** — checkbox select + "Delete Selected"
@@ -184,6 +203,22 @@ GET    /admin/analytics            → Dashboard data
 GET    /admin/schedule             → Re-training schedule
 PUT    /admin/schedule             → Set re-training schedule
 GET    /admin/training/logs        → Poll training status
+
+# Chat Users (tenant admin)
+GET    /admin/chat-users           → List chat users (?status=pending)
+GET    /admin/chat-users/pending-count → Pending badge count
+POST   /admin/chat-users           → Create user (instant active)
+PUT    /admin/chat-users/{id}/approve → Approve pending user
+PUT    /admin/chat-users/{id}/reject  → Reject pending user
+PUT    /admin/chat-users/{id}/disable → Disable active user
+DELETE /admin/chat-users/{id}       → Delete user
+GET    /admin/chat-login-required   → Get login required setting
+PUT    /admin/chat-login-required   → Toggle login required
+
+# Chat Auth (public — no admin token needed)
+POST   /api/t/{id}/chat-auth/login    → Chat user login → token
+POST   /api/t/{id}/chat-auth/register → Request access → pending
+GET    /api/t/{id}/chat-auth/check    → Check login required + validate token
 
 # Chat
 POST   /chat                       → SSE streaming chat

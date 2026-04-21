@@ -8,8 +8,8 @@ import re as _re
 import time
 from queue import Queue
 from pathlib import Path
-from fastapi import APIRouter
-from fastapi.responses import StreamingResponse
+from fastapi import APIRouter, Request
+from fastapi.responses import StreamingResponse, JSONResponse
 
 from backend.models.schemas import ChatRequest
 from backend.core.agent import ask, generate_suggestions
@@ -257,8 +257,20 @@ async def chat_event_stream(request: ChatRequest, tenant_id: str = None):
 
 
 @router.post("/api/t/{tenant_id}/chat")
-async def tenant_chat(tenant_id: str, request: ChatRequest):
+async def tenant_chat(tenant_id: str, request: ChatRequest, raw_request: Request):
     """Tenant-scoped chat — agent only sees this tenant's documents."""
+    # Check if chat login is required
+    tenant = db.get_tenant(tenant_id)
+    _clr = tenant.get("chat_login_required", False) if tenant else False
+    if _clr is True or _clr == "true" or _clr == "TRUE":
+        auth_header = raw_request.headers.get("Authorization", "")
+        token = auth_header.replace("Bearer ", "").strip() if auth_header.startswith("Bearer ") else ""
+        if not token:
+            return JSONResponse({"error": "Authentication required"}, status_code=401)
+        from backend.main import _validate_token
+        token_info = _validate_token(token)
+        if not token_info or token_info.get("tenant_id") != tenant_id:
+            return JSONResponse({"error": "Invalid or expired token"}, status_code=401)
     return StreamingResponse(
         chat_event_stream(request, tenant_id=tenant_id),
         media_type="text/event-stream",
