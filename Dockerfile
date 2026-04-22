@@ -6,7 +6,7 @@
 # ============================================================================
 
 # --- Stage 1: Build Frontend ---
-FROM --platform=linux/amd64 node:22-slim AS frontend-builder
+FROM node:22-slim AS frontend-builder
 
 WORKDIR /frontend
 
@@ -18,7 +18,7 @@ RUN npm run build
 # Output: /frontend/build/ (static HTML/JS/CSS)
 
 # --- Stage 2: Python API + Frontend ---
-FROM --platform=linux/amd64 python:3.11-slim
+FROM python:3.11-slim
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
